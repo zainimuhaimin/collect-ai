@@ -1,0 +1,9 @@
+pandas
+xgboost
+scikit-learn
+openpyxl
+sqlalchemy
+psycopg2-binary
+fastapi
+uvicorn
+pydantic-settings
