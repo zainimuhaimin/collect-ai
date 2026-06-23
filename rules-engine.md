@@ -51,12 +51,12 @@ LLM harus mengklasifikasikan nasabah ke dalam 4 segmen berikut berdasarkan param
 
 ### B. Aturan Rekomendasi Tindakan (`NBA_RECOMMENDATION`)
 
-LLM harus mengekstrak pola interaksi historis mana yang paling sering berujung pada pelunasan untuk menentukan `COLLECTION_SENSITIVITY`.
+LLM harus mengekstrak pola interaksi historis mana yang paling sering berujung pada pelunasan untuk menentukan `NBA_RECOMMENDATION` dan `COLLECTION_SENSITIVITY`.
 
 * **WA / SMS (Low Effort):**
     * *Syarat:* Nasabah berada di segmen **Self-cure** atau memiliki riwayat sering membayar H+1 setelah dikirimkan pesan singkat.
 * **Call / Deskcoll (Mid Effort):**
-    * *Syarat:* Nasabah berada di segmen **Can Pay** dan belum memberikan respons via WA, namun secara historis pernah memberikan janji bayar via telepon.
+    * *Syarat:* Nasabah berada di segmen **Can Pay** dan belum memberikan respons via WA, namun secara historis pernah memberikan janji bayar via telepon/deskcoll.
 * **Visit (High Effort):**
     * *Syarat:* Nasabah mengabaikan WA/Call lebih dari 2 kali, ATAU `RECOVERY_SCORE` mulai turun di bawah 0.50, ATAU interaksi sebelumnya "Rumah Kosong". Kunjungan fisik diperlukan untuk konfirmasi keberadaan nasabah/aset.
 * **Somasi / Pickup Unit (Critical Effort):**
@@ -66,10 +66,46 @@ LLM harus mengekstrak pola interaksi historis mana yang paling sering berujung p
 
 Pemandu bagi *collector* di lapangan untuk menentukan mana yang harus dikerjakan terlebih dahulu pada hari tersebut.
 
-* **Critical:** Utang (`PRNC_OTS`) **SANGAT BESAR** + Segmen **Can Pay** + Rekomendasi **Visit/Somasi**. (Prioritas tertinggi karena *impact* finansial ke perusahaan besar jika lolos).
-* **High:** Utang menengah/besar + Segmen **Cannot Pay / Won't Pay** + Butuh **Visit**.
-* **Medium:** DPD masih kecil (C1) tapi nominal utang lumayan besar + Butuh pengingat **Call**.
-* **Low:** Segmen **Self-cure** dengan utang sisa sedikit. Cukup otomatisasi **WA/SMS** oleh sistem bot.
+* **Critical:** 
+    * *Syarat:* Utang (`PRNC_OTS`) **SANGAT BESAR (> 15 Juta)** + Segmen **Can Pay** + Rekomendasi **Visit/Somasi**. 
+    * *Logika:* Prioritas tertinggi karena *impact* finansial ke perusahaan besar jika lolos.
+* **High:** 
+    * *Syarat:* Utang menengah/besar (> 10 Juta) + Segmen **Cannot Pay / Won't Pay** + Butuh **Visit** ATAU DPD > 60 hari.
+* **Medium:** 
+    * *Syarat:* DPD masih C1 (15-30 hari) tapi nominal utang lumayan besar (> 5 Juta) + Butuh pengingat **Call**.
+* **Low:** 
+    * *Syarat:* Segmen **Self-cure** dengan utang sisa sedikit. Cukup otomatisasi **WA/SMS** oleh sistem bot.
+
+### D. Aturan Keandalan PTP (`PTP_RELIABILITY_INDEX`)
+
+Indeks ini mengukur seberapa reliable nasabah dalam memenuhi janji bayar berdasarkan historis:
+
+* *Formula:* `PTP_Reliability = (Promise_Fulfilled / Total_PTP_Attempts) * 0.80 + 0.20`
+* *Interpretasi:*
+    * **0.80 - 1.00:** Nasabah sangat reliable, janji bayarnya biasanya ditepati.
+    * **0.50 - 0.79:** Nasabah cukup reliable, sebagian janji ditepati.
+    * **0.20 - 0.49:** Nasabah kurang reliable, banyak janji yang tidak ditepati.
+    * **0.00 - 0.19:** Nasabah sangat tidak reliable, hampir tidak pernah menepati janji.
+* *Implementasi:* Sistem menghitung rasio antara Bayar/PTP vs total PTP attempts. Jika tidak ada PTP history, default 0.70 (cukup reliable).
+
+### E. Aturan Sensitivitas Koleksi (`COLLECTION_SENSITIVITY`)
+
+Menentukan metode komunikasi/penagihan yang paling efektif berdasarkan historis keberhasilan:
+
+* *Logika:* Sistem menganalisis historis interaksi untuk setiap treatment type (WA, Call, Visit, Somasi) dan menghitung success rate (Bayar + PTP).
+* *Keputusan:* Treatment dengan success rate tertinggi direkomendasikan sebagai `COLLECTION_SENSITIVITY`.
+* *Default:*
+    * Jika RECOVERY_SCORE > 0.80: WA
+    * Jika 0.50 ≤ RECOVERY_SCORE ≤ 0.80: Call
+    * Jika RECOVERY_SCORE < 0.50: Visit
+
+### F. Aturan Status B-List (`B_LIST_STATUS`)
+
+Menentukan apakah nasabah perlu masuk ke *Problem Account List*:
+
+* *Syarat Masuk B-List:*
+    * `RECOVERY_SCORE` < **0.20** (masuk kategori Won't Pay), ATAU
+    * Rejection Rate > **50%** (lebih banyak "Menolak" atau "Rumah Kosong" dari total interaksi).
 
 ---
 

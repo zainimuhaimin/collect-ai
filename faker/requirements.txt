@@ -2,3 +2,5 @@ pandas
 numpy
 Faker
 openpyxl
+sqlalchemy
+psycopg2-binary
