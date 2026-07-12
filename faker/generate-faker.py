@@ -19,7 +19,7 @@ from helpers.database import append_dataframes_to_postgres
 fake = Faker('id_ID')
 
 # Setup Parameter Jumlah Data
-NUM_CUSTOMERS = 50
+NUM_CUSTOMERS = 100
 
 print("Mulai menghasilkan data dummy...")
 
@@ -186,7 +186,7 @@ def generate_lkp_history(df_contr):
                 elif row['DPD_CURRENT'] <= 60:
                     treatment = random.choices(['Deskcoll', 'WA', 'Visit'], weights=[0.4, 0.3, 0.3])[0]
                 else:
-                    treatment = random.choices(['Visit', 'Somasi', 'Deskcoll'], weights=[0.5, 0.3, 0.2])[0]
+                    treatment = random.choices(['Visit', 'Somasi', 'Pickup'], weights=[0.4, 0.3, 0.3])[0]
 
                 # Result probability depends on DPD
                 if row['DPD_CURRENT'] <= 15:

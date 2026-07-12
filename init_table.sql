@@ -83,22 +83,22 @@ CREATE TABLE IF NOT EXISTS customer_analysis (
 -- | `INCOME_MID_PROXY` | 8.000.000 | Proxy pendapatan bulanan untuk INCOME_LEVEL=Mid |
 -- | `INCOME_HIGH_PROXY` | 20.000.000 | Proxy pendapatan bulanan untuk INCOME_LEVEL=High |
 
-CREATE TABLE IF NOT EXISTS treshold_config (
-    treshold_name VARCHAR(50) PRIMARY KEY,
-    treshold_value BIGINT,
-    description TEXT
-);
+-- CREATE TABLE IF NOT EXISTS treshold_config (
+--     treshold_name VARCHAR(50) PRIMARY KEY,
+--     treshold_value BIGINT,
+--     description TEXT
+-- );
 
-INSERT INTO treshold_config (treshold_name, treshold_value, description) VALUES
-('PTP_DAYS_WINDOW', 7, 'Days after PROMISE_DATE to consider "PTP kept"'),
-('THRESHOLD_OTS_LOW', 5000000, 'Lower threshold of OTS for priority matrix'),
-('THRESHOLD_OTS_HIGH', 20000000, 'Upper threshold of OTS for priority matrix'),
-('BROKEN_PTP_BLACKLIST', 5, 'Number of broken PTPs to enter B_LIST'),
-('HISTORICAL_DEFAULT_BLACKLIST', 3, 'Number of C3+ contracts to enter B_LIST'),
-('DELAY_TREND_WINDOW', 6, 'Historical window to calculate delay_trend'),
-('REJECTION_THRESHOLD', 2, 'Number of rejections for Won''t Pay classification'),
-('SEGMENT_SHIFT_ALERT', 15, 'Threshold for distribution change that triggers alert'),
-('RECENCY_WEIGHT_DECAY', 0.7, 'Weight of old contracts vs latest contract'),
-('INCOME_LOW_PROXY', 3000000, 'Monthly income proxy for INCOME_LEVEL=Low'),
-('INCOME_MID_PROXY', 8000000, 'Monthly income proxy for INCOME_LEVEL=Mid'),
-('INCOME_HIGH_PROXY', 20000000, 'Monthly income proxy for INCOME_LEVEL=High');
+-- INSERT INTO treshold_config (treshold_name, treshold_value, description) VALUES
+-- ('PTP_DAYS_WINDOW', 7, 'Days after PROMISE_DATE to consider "PTP kept"'),
+-- ('THRESHOLD_OTS_LOW', 5000000, 'Lower threshold of OTS for priority matrix'),
+-- ('THRESHOLD_OTS_HIGH', 20000000, 'Upper threshold of OTS for priority matrix'),
+-- ('BROKEN_PTP_BLACKLIST', 5, 'Number of broken PTPs to enter B_LIST'),
+-- ('HISTORICAL_DEFAULT_BLACKLIST', 3, 'Number of C3+ contracts to enter B_LIST'),
+-- ('DELAY_TREND_WINDOW', 6, 'Historical window to calculate delay_trend'),
+-- ('REJECTION_THRESHOLD', 2, 'Number of rejections for Won''t Pay classification'),
+-- ('SEGMENT_SHIFT_ALERT', 15, 'Threshold for distribution change that triggers alert'),
+-- ('RECENCY_WEIGHT_DECAY', 0.7, 'Weight of old contracts vs latest contract'),
+-- ('INCOME_LOW_PROXY', 3000000, 'Monthly income proxy for INCOME_LEVEL=Low'),
+-- ('INCOME_MID_PROXY', 8000000, 'Monthly income proxy for INCOME_LEVEL=Mid'),
+-- ('INCOME_HIGH_PROXY', 20000000, 'Monthly income proxy for INCOME_LEVEL=High');
