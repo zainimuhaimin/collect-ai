@@ -886,7 +886,7 @@ Jika sukses → print breakdown per RISK_SEGMENT dan PRIORITY_LEVEL.
 ---
 
 ### TASK-22: Implementasi Outcome Labeler (MLOps)
-**Status**: [ ] Pending
+**Status**: [x] Done
 **Dependencies**: TASK-12
 **Output file**: `src/outcome_labeler.py` (sudah ada, tambahkan fungsi)
 
@@ -909,7 +909,7 @@ Tambahkan fungsi `get_labeled_dataset(engine)` yang load semua data dari
 ---
 
 ### TASK-23: Implementasi Model Monitor
-**Status**: [ ] Pending
+**Status**: [x] Done
 **Dependencies**: TASK-22
 **Output file**: `src/model_monitor.py`
 
@@ -938,7 +938,7 @@ Hitung PSI untuk setiap fitur. Return (results_dict, needs_retrain_bool).
 ---
 
 ### TASK-24: Implementasi Champion-Challenger
-**Status**: [ ] Pending
+**Status**: [x] Done
 **Dependencies**: TASK-14, TASK-23
 **Output file**: `src/champion_challenger.py`
 
@@ -971,7 +971,7 @@ Print konfirmasi.
 ---
 
 ### TASK-25: Implementasi Weekly MLOps Orchestrator
-**Status**: [ ] Pending
+**Status**: [x] Done
 **Dependencies**: TASK-22, TASK-23, TASK-24, TASK-13
 **Output file**: `pipelines/weekly_mlops.py`
 

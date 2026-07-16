@@ -7,7 +7,7 @@ import os
 # ── DATABASE ──────────────────────────────────────────────────────
 DB_URL = os.environ.get(
     "COLLECTAI_DB_URL",
-    "postgresql://postgres:postgres@localhost:5432/collect_ai",
+    "postgresql://postgres:123123@localhost:5432/collect_ai",
 )
 
 # ── PATH (relatif terhadap folder machine-learning) ───────────────

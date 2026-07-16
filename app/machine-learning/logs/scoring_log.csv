@@ -1,3 +1,2 @@
 run_at,reference_date,n_scored,wont_pay_pct,self_cure_pct,critical_pct,segment_breakdown,priority_breakdown
-2026-07-08T15:19:23.089044,2026-07-08,140,0.0,0.0,0.0,{'Can Pay': 140},"{'Medium': 87, 'Low': 47, 'High': 6}"
-2026-07-12T22:23:40.147929,2026-07-12,731,0.1614,0.4514,0.0917,"{'Self-cure': 330, 'Can Pay': 267, ""Won't Pay"": 118, 'Cannot Pay': 16}","{'Low': 359, 'Medium': 207, 'High': 98, 'Critical': 67}"
+2026-07-15T10:48:37.477954,2026-07-15,704,0.1307,0.4503,0.0682,"{'Self-cure': 317, 'Can Pay': 280, ""Won't Pay"": 92, 'Cannot Pay': 15}","{'Low': 350, 'Medium': 203, 'High': 103, 'Critical': 48}"

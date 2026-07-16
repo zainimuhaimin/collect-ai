@@ -140,3 +140,19 @@ def label_historical_scores(
         )
 
     return to_label
+
+
+def get_labeled_dataset(engine) -> pd.DataFrame:
+    """Ambil seluruh dataset labeled untuk monitoring dan retraining."""
+    try:
+        labeled = pd.read_sql("SELECT * FROM scoring_labels", engine)
+    except Exception:
+        return pd.DataFrame()
+
+    labeled.columns = [c.lower() for c in labeled.columns]
+    if labeled.empty:
+        print("[Labeler] belum ada labeled dataset")
+        return labeled
+
+    print(f"[Labeler] {len(labeled):,} records labeled tersedia untuk MLOps")
+    return labeled

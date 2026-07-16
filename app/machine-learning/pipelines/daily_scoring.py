@@ -5,7 +5,7 @@ from datetime import datetime
 import os
 import sys
 import pandas as pd
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, inspect
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
@@ -39,9 +39,33 @@ def _upsert_ai_output(engine, df_publish: pd.DataFrame):
     payload = df_publish[cols].copy()
 
     with engine.begin() as conn:
-        conn.execute(text("DELETE FROM ai_intelligence_output"))
         if len(payload) > 0:
+            try:
+                conn.execute(
+                    text("DELETE FROM ai_intelligence_output WHERE scoring_date = :scoring_date"),
+                    {"scoring_date": payload["scoring_date"].iloc[0]},
+                )
+            except Exception:
+                pass
             payload.to_sql("ai_intelligence_output", conn, if_exists="append", index=False)
+
+
+def _upsert_feature_snapshot(engine, df_features: pd.DataFrame, scoring_date):
+    snapshot = df_features.copy()
+    snapshot["scoring_date"] = scoring_date
+    snapshot["updated_at"] = datetime.now()
+
+    inspector = inspect(engine)
+    if inspector.has_table("scoring_feature_snapshot"):
+        with engine.begin() as conn:
+            conn.execute(
+                text("DELETE FROM scoring_feature_snapshot WHERE scoring_date = :scoring_date"),
+                {"scoring_date": scoring_date},
+            )
+            
+    if len(snapshot) > 0:
+        with engine.begin() as conn:
+            snapshot.to_sql("scoring_feature_snapshot", conn, if_exists="append", index=False)
 
 
 def _append_log(summary: dict):
@@ -134,6 +158,7 @@ def run_daily_scoring(reference_date=None):
     df_scored["scoring_date"] = ref_date
     df_scored["updated_at"] = datetime.now()
     _upsert_ai_output(engine, df_scored)
+    _upsert_feature_snapshot(engine, df_features, ref_date)
 
     # Step 9
     segment_counts = df_scored["risk_segment"].value_counts().to_dict()

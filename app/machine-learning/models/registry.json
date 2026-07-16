@@ -1,14 +1,14 @@
 {
   "current_champion": {
-    "version": "v2",
+    "version": "v1",
     "path": "/Users/mcdmobiledev11/Development/MCD/collect-ai/app/machine-learning/models/recovery_model_champion.pkl",
     "role": "champion",
-    "registered": "2026-07-12T22:23:22.539440",
+    "registered": "2026-07-15T10:46:06.488821",
     "strategy": "recency_weighted",
-    "n_samples": 731,
-    "auc": 0.9719,
+    "n_samples": 704,
+    "auc": 0.9716,
     "decay_rate": 0.7,
-    "trained_at": "2026-07-12T22:23:22.531936"
+    "trained_at": "2026-07-15T10:46:06.484010"
   },
   "current_challenger": null,
   "history": [
@@ -16,23 +16,12 @@
       "version": "v1",
       "path": "/Users/mcdmobiledev11/Development/MCD/collect-ai/app/machine-learning/models/recovery_model_champion.pkl",
       "role": "champion",
-      "registered": "2026-07-08T15:16:17.730877",
+      "registered": "2026-07-15T10:46:06.488821",
       "strategy": "recency_weighted",
-      "n_samples": 140,
-      "auc": 0.5,
+      "n_samples": 704,
+      "auc": 0.9716,
       "decay_rate": 0.7,
-      "trained_at": "2026-07-08T15:16:17.724557"
-    },
-    {
-      "version": "v2",
-      "path": "/Users/mcdmobiledev11/Development/MCD/collect-ai/app/machine-learning/models/recovery_model_champion.pkl",
-      "role": "champion",
-      "registered": "2026-07-12T22:23:22.539440",
-      "strategy": "recency_weighted",
-      "n_samples": 731,
-      "auc": 0.9719,
-      "decay_rate": 0.7,
-      "trained_at": "2026-07-12T22:23:22.531936"
+      "trained_at": "2026-07-15T10:46:06.484010"
     }
   ]
 }

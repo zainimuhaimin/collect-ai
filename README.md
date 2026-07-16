@@ -1,387 +1,158 @@
 # 🚀 CollectAI Machine Learning System
 
-**Advanced ML-powered recovery score prediction for debt collection management**
+## 1. 📖 Overview
+CollectAI adalah sistem kecerdasan buatan (AI) berbasis Machine Learning yang dirancang khusus untuk manajemen penagihan (debt collection). Sistem ini memprediksi *Recovery Score* (probabilitas pembayaran) dari nasabah yang menunggak dan merekomendasikan saluran komunikasi terbaik (*Next Best Action* / NBA), serta mengkategorikan prioritas penagihan secara harian. Dengan mengautomasi pengambilan keputusan, CollectAI meningkatkan efisiensi dan tingkat keberhasilan penagihan.
 
----
+## 2. 🏗️ Architecture Diagram
 
-## 📋 Table of Contents
+```ascii
+┌─────────────────────────────────────────┐
+│              INPUT TABLES               │
+│ 1. customer_master (Profil Nasabah)     │
+│ 2. contract_snapshot (Data Pinjaman)    │
+│ 3. payment_history (Riwayat Pembayaran) │
+│ 4. lkp_interaction (Log Interaksi)      │
+└───────────────────┬─────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────┐
+│         FEATURE ENGINEERING             │
+│ Ekstraksi 21 fitur (Contract & Customer)│
+└───────────────────┬─────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────┐
+│            AI ENGINE (XGBoost)          │
+│ Prediksi Probabilitas & Aturan Bisnis   │
+└─────────┬─────────────────────┬─────────┘
+          │                     │
+          ▼                     ▼
+┌───────────────────┐ ┌───────────────────┐
+│   OUTPUT TABLE 1  │ │   OUTPUT TABLE 2  │
+│ ai_intelligence_  │ │ customer_behavior-│
+│ output            │ │ al_standing (CBS) │
+│ (Scoring Harian)  │ │ (Profil Perilaku) │
+└───────────────────┘ └───────────────────┘
+```
 
-- [Quick Start](#-quick-start)
-- [Prerequisites](#-prerequisites)
-- [Setup Guide](#-setup-guide)
-- [Running the ML Pipeline](#-running-the-ml-pipeline)
-- [System Architecture](#-system-architecture)
+## 3. ⚡ Quick Start
 
----
-
-## ⚡ Quick Start
-
-Get the system running in 5 minutes:
+Jalankan sistem dari nol hingga *first scoring* dengan langkah-langkah berikut:
 
 ```bash
-# 1. Create virtual environment
+# 1. Buat dan aktifkan virtual environment
 python3 -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate  # macOS/Linux (Gunakan .venv\Scripts\activate untuk Windows)
 
 # 2. Install dependencies
 cd app/machine-learning
-pip install -r requirements.txt
-
-# 3. Setup database
-psql -U postgres -f config/schema.sql
-
-# 4. Generate sample data
-python ../../faker/generate-faker-realistic.py
-
-# 5. Train initial model
-python pipelines/train_initial_model.py
-
-# 6. Run daily scoring
-python pipelines/daily_scoring.py
-```
-
----
-
-## 📦 Prerequisites
-
-### System Requirements
-- **Python**: 3.9+ (tested on 3.9.6)
-- **PostgreSQL**: 12+ (with psycopg2 driver)
-- **macOS**: libomp (OpenMP runtime for XGBoost)
-  ```bash
-  brew install libomp
-  ```
-
-### Python Packages
-All dependencies specified in `app/machine-learning/requirements.txt`:
-- XGBoost 2.1.4 (gradient boosting model)
-- scikit-learn 1.6.1 (ML utilities)
-- pandas 2.3.3 (data manipulation)
-- SQLAlchemy 2.0.51 (database ORM)
-- psycopg2-binary 2.9.12 (PostgreSQL adapter)
-
----
-
-## 🔧 Setup Guide
-
-### Step 1️⃣: Create Virtual Environment
-
-```bash
-cd /path/to/collect-ai
-python3 -m venv .venv
-source .venv/bin/activate  # macOS/Linux
-# or: .venv\Scripts\activate  # Windows
-```
-
-### Step 2️⃣: Install Dependencies
-
-```bash
-cd app/machine-learning
 pip install --upgrade pip
 pip install -r requirements.txt
-```
 
-**Verification:**
-```bash
-python -c "import xgboost, sklearn, pandas, sqlalchemy; print('✓ All packages imported successfully')"
-```
-
-### Step 3️⃣: Create Database Schema
-
-Initialize PostgreSQL database with CollectAI schema:
-
-```bash
+# 3. Setup schema database PostgreSQL (Gunakan kredensial yang relevan)
 psql -U postgres -d collect_ai -f config/schema.sql
-```
 
-**Tables created:**
-- `customer_master` — Customer demographics & risk profile
-- `contract_snapshot` — Active loan contracts
-- `payment_history` — Monthly payment records
-- `lkp_interaction` — Collection interaction logs
-- `customer_behavioral_standing` — CBS profile per customer
-- `ai_intelligence_output` — Daily scoring results
-
-**Verify setup:**
-```bash
-psql -U postgres -d collect_ai -c "\dt"
-```
-
-### Step 4️⃣: Generate Sample Data
-
-Generate realistic synthetic data using Faker:
-
-```bash
+# 4. Generate sample data (Faker)
 cd ../../faker
 python generate-faker-realistic.py
-```
-
-**What this does:**
-- Generates 100 customers with realistic demographics
-- Creates 150-200 contracts with income-based risk profiles
-- Simulates 18 months of payment history
-- Includes collection interaction logs
-- Ensures 35-40% paid rate (realistic default distribution)
-- Populates all 4 input tables
-
-**Expected output:**
-```
-Mulai menghasilkan data dummy...
-Generated 100 customers
-Generated 180 contracts (avg 1.8 per customer)
-Generated 720 payment records
-Generated 85 collection interactions
-Saving to Excel: Dataset_CollectAI_Dummy.xlsx
-Exporting to PostgreSQL... ✓ Success
-```
-
----
-
-## 🎯 Running the ML Pipeline
-
-### Step 5️⃣: Train Initial Recovery Model
-
-Build the champion model using training data:
-
-```bash
 cd ../app/machine-learning
+
+# 5. Latih model champion awal
 python pipelines/train_initial_model.py
-```
 
-**What this pipeline does:**
-
-| Stage | Action | Output |
-|-------|--------|--------|
-| **Feature Engineering** | Extract 20+ features from 4 source tables | `contract_features.pkl` |
-| **CBS Building** | Compute Customer Behavioral Standing grades | Updates `customer_behavioral_standing` |
-| **Outcome Labeling** | Build target variable (paid/unpaid) | Training dataset n=150 |
-| **Model Training** | Train XGBoost with recency-weighted strategy | Precision, Recall, AUC metrics |
-| **Model Registration** | Version and register champion model | `models/recovery_model_champion.pkl` |
-
-**Expected output:**
-```
-[Labeler] training: n=150, paid=55 (36.7%), unpaid=95
-[Model] Training with strategy: recency_weighted (decay_rate=0.70)
-[Model] Cross-validation AUC: 0.68 (+/- 0.08)
-[Model] Top features: ptp_reliability_index, delay_trend, payment_rate
-[Registry] Model registered as champion v3
-✓ Model saved: models/recovery_model_champion.pkl
-```
-
-**Model artifact details:**
-- **Location**: `models/recovery_model_champion.pkl`
-- **Version**: Tracked in `models/registry.json`
-- **AUC Threshold**: MIN_CV_AUC_TO_DEPLOY = 0.50 (configurable via env var)
-
-### Step 6️⃣: Run Daily Scoring Pipeline
-
-Score all active contracts and publish results:
-
-```bash
+# 6. Jalankan daily scoring pertama
 python pipelines/daily_scoring.py
 ```
 
-**What this pipeline does:**
+## 4. 📂 File Structure
 
-| Stage | Action | Output |
-|-------|--------|--------|
-| **Load Data** | Fetch all active contracts from DB | n=180 contracts |
-| **Feature Extraction** | Compute real-time features for scoring | 20 features per contract |
-| **Model Scoring** | Apply champion model to generate RECOVERY_SCORE | Probability 0.0-1.0 |
-| **Confidence Level** | Compute confidence score (data quality, history depth, model certainty) | CONFIDENCE_LEVEL 0.0-1.0 |
-| **Business Rules** | Apply decision logic (segmentation, NBA, priority) | RISK_SEGMENT, CHANNEL, PRIORITY |
-| **Quality Checks** | Validate output integrity & distribution | Hard & soft checks |
-| **Publish Results** | Insert scoring output to `ai_intelligence_output` table | Daily snapshot |
+Penjelasan singkat tentang struktur folder dan file pada `app/machine-learning`:
 
-**Expected output:**
+```text
+app/machine-learning/
+├── config/
+│   ├── settings.py          # Threshold, konstanta, parameter model, & config sistem
+│   └── schema.sql           # DDL untuk membuat tabel input dan output di database
+├── data/
+│   ├── raw/                 # Folder untuk data mentah/CSV
+│   └── samples/             # Folder hasil sample data generator
+├── models/
+│   ├── archive/             # Model lama yang digantikan (backup rollback)
+│   └── registry.json        # File registrasi versi model (champion & challenger)
+├── src/                     # Core system modules
+│   ├── feature_engineering.py # Logika ekstraksi fitur
+│   ├── cbs_builder.py       # Logika Customer Behavioral Standing
+│   ├── scoring_engine.py    # Mesin utama inferensi dan quality check
+│   ├── business_rules.py    # Logika NBA, Risk Segment, & Prioritas
+│   ├── outcome_labeler.py   # Pembuat label actual paid/unpaid
+│   ├── model_monitor.py     # Logika drift detection dan monitoring performa
+│   ├── retrain_strategies.py# Pilihan strategi training (rolling window, recency)
+│   └── model_registry.py    # Pengelola versioning model
+├── pipelines/               # Runner utama
+│   ├── train_initial_model.py # Script untuk training awal
+│   ├── daily_scoring.py     # Entry point harian untuk skor seluruh kontrak aktif
+│   └── weekly_mlops.py      # Entry point mingguan untuk evaluasi & retraining otomatis
+├── tests/                   # Kumpulan Unit Test
+└── requirements.txt         # Daftar dependency package Python
 ```
-[Daily Scoring] Loading contracts...
-[Daily Scoring] CBS bootstrap: 50 records
-[Daily Scoring] Scoring 180 contracts...
 
-[QC] Summary
-  - range_score_confidence   [hard] PASS
-  - null_required            [hard] PASS
-  - duplicate_contract_no    [hard] PASS
-  - wont_pay_pct<=30%        [soft] PASS
-  - cust_exists_in_cbs       [soft] PASS
+## 5. ⚙️ Configuration
 
-✓ [Daily Scoring] Success
-  Contracts scored: 180
-  Segment breakdown: {'Can Pay': 95, 'Cannot Pay': 55, 'Won't Pay': 28, 'Self-cure': 2}
-  Priority breakdown: {'Critical': 8, 'High': 42, 'Medium': 85, 'Low': 45}
-```
+Seluruh aturan bisnis, threshold risiko, hiperparameter model, dan *flag* sistem diatur secara terpusat di `config/settings.py`. 
 
-**Output stored in:**
-- Database table: `ai_intelligence_output`
-- Columns: `contract_no`, `recovery_score`, `confidence_level`, `risk_segment`, `nba_recommendation`, `priority_level`, `scoring_date`
+**Cara mengubah threshold:**
+1. Buka file `config/settings.py`.
+2. Cari variabel yang relevan, misalnya untuk mengubah batas skor kategori "Won't Pay":
+   ```python
+   # Ubah dari 0.30 menjadi 0.25
+   SCORE_THRESHOLD_WONT_PAY = 0.25
+   ```
+3. Simpan file. Perubahan akan langsung aktif pada *run* `daily_scoring.py` berikutnya tanpa perlu modifikasi *source code* utama.
+4. *Catatan:* Perubahan pada variabel `FEATURE_COLS` atau `TARGET_COL` **mewajibkan** *retraining* model (`train_initial_model.py` atau melalui siklus `weekly_mlops.py`).
+
+## 6. 🕒 Schedules
+
+Untuk otomatisasi, sistem harus dijadwalkan menggunakan Cron atau Apache Airflow dengan waktu eksekusi:
+
+1. **Daily Scoring (`pipelines/daily_scoring.py`)**
+   - **Kapan:** Setiap malam pukul **23:00** (setelah seluruh transaksi hari itu selesai).
+   - **Apa yang dilakukan:** Menghitung fitur terbaru, menjalankan *inference*, mengaplikasikan *business rules*, dan mem-publish rekomendasi penagihan untuk besok pagi ke tabel `ai_intelligence_output`.
+
+2. **Weekly MLOps (`pipelines/weekly_mlops.py`)**
+   - **Kapan:** Seminggu sekali, idealnya Minggu malam / Senin dini hari pukul **01:00**.
+   - **Apa yang dilakukan:** Memberikan label actual *paid* untuk skor yang sudah jatuh tempo, menghitung AUC champion saat ini, memeriksa *data drift*, memicu re-training jika perlu, dan mempromosikan model *challenger* jika terbukti lebih baik.
+
+## 7. 🔄 Model Retraining
+
+Sistem CollectAI menerapkan MLOps berbasis **Feedback Loop otomatis**. Model diperbarui berdasarkan kondisi berikut:
+
+- **Kapan Retraining Terpicu?** 
+  Retraining akan dilakukan oleh `weekly_mlops.py` jika salah satu kondisi ini terpenuhi:
+  1. Performa model (*AUC*) turun di bawah `AUC_FLOOR` (misalnya 0.68).
+  2. Terjadi *data drift* yang masif (`N_CRITICAL_DRIFT_TRIGGER` tercapai, misal > 2 fitur utama distribusi datanya bergeser drastis).
+  3. Model sudah terlalu lama tidak diperbarui (contoh: > 3 bulan).
+- **Bagaimana Prosesnya?**
+  Ketika di-trigger, sistem menjalankan *retrain* menggunakan `strategy_recency_weighted` (memberi bobot lebih tinggi pada data terbaru). Model baru didaftarkan sebagai **Challenger**. Challenger akan di-evaluasi *shadow mode* bersama Champion, dan dipromosikan otomatis menjadi Champion jika AUC-nya mengungguli Champion setidaknya sebesar `MIN_AUC_IMPROVEMENT` (misal +0.02).
+
+## 8. 🆘 Troubleshooting
+
+Berikut 5 error umum dan cara mengatasinya:
+
+1. **Error:** `xgboost.core.XGBoostError: libomp.dylib not found` (khusus macOS)
+   - **Penyebab:** *OpenMP runtime* yang dibutuhkan XGBoost belum ter-install.
+   - **Solusi:** Jalankan `brew install libomp`.
+2. **Error:** `ValueError: AUC 0.48 di bawah threshold 0.50`
+   - **Penyebab:** Data training yang diberikan terlalu sedikit atau polanya acak, sehingga model tidak bisa menemukan relasi *recovery*.
+   - **Solusi:** Tambahkan lebih banyak data training (jalankan script Faker lebih banyak) atau pastikan proporsi label kelas `actual_paid` tidak sangat timpang (misal 100% unpaid).
+3. **Error:** `psycopg2.OperationalError: Connection refused`
+   - **Penyebab:** Server database PostgreSQL belum berjalan atau konfigurasi koneksi di `settings.py` salah.
+   - **Solusi:** Pastikan service PostgreSQL jalan, periksa string koneksi di `DB_URL` dalam file `settings.py`, dan pastikan *username/password* PostgreSQL yang digunakan valid.
+4. **Error:** `ValueError: Terdapat NULL pada recovery_score`
+   - **Penyebab:** Model artifact rusak atau ada kolom di `FEATURE_COLS` yang tidak dapat dikonversi ke numerik.
+   - **Solusi:** Periksa `config/settings.py` jika ada tambahan fitur baru, pastikan `compute_contract_features` dan metode lainnya hanya menghasilkan tipe *float/integer*, dan *retrain* model.
+5. **Error:** `QC hard-fail: duplicate_contract_no`
+   - **Penyebab:** Data `contract_snapshot` memiliki baris duplikat untuk `contract_no` yang sama.
+   - **Solusi:** Sistem AI membaca kontrak secara unik. Hapus duplikasi data pada tingkat tabel *raw database* `contract_snapshot` agar integrasi relasi satu *contract* = satu baris hasil *score* tetap valid.
 
 ---
-
-## 🏗️ System Architecture
-
-### Data Flow
-```
-┌──────────────────┐
-│   4 Input Tables │
-│  (customer_*,    │
-│   contract_*,    │
-│   payment_*,     │
-│   lkp_*)         │
-└────────┬─────────┘
-         │
-         ▼
-┌──────────────────────┐
-│ Feature Engineering  │ ← 20 features per contract
-└────────┬─────────────┘
-         │
-         ▼
-┌──────────────────────┐
-│ CBS Building         │ ← Customer Behavioral Standing
-└────────┬─────────────┘
-         │
-         ▼
-┌──────────────────────┐
-│ Model Scoring        │ ← XGBoost Champion
-└────────┬─────────────┘
-         │
-         ▼
-┌──────────────────────┐
-│ Business Rules       │ ← Segmentation, NBA, Priority
-└────────┬─────────────┘
-         │
-         ▼
-┌──────────────────────┐
-│ Quality Checks       │ ← Validation & Distribution
-└────────┬─────────────┘
-         │
-         ▼
-┌──────────────────────┐
-│ ai_intelligence_     │ ← Daily Output
-│ output (Published)   │
-└──────────────────────┘
-```
-
-### Key Components
-
-**Training Pipeline** (`pipelines/train_initial_model.py`)
-- Loads historical data
-- Builds features & CBS
-- Trains XGBoost model
-- Registers model version
-
-**Daily Scoring Pipeline** (`pipelines/daily_scoring.py`)
-- Scores all active contracts
-- Applies business rules
-- Validates output quality
-- Publishes results daily
-
-**Model Registry** (`src/model_registry.py`)
-- Version tracking (champion/challenger)
-- Performance history
-- Rollback capability
-
-**Monitoring & MLOps** (Phase 6 - in development)
-- Model drift detection
-- Champion-challenger evaluation
-- Weekly retraining orchestration
-
----
-
-## 📊 Sample Queries
-
-### View Scoring Results
-```sql
-SELECT contract_no, recovery_score, risk_segment, priority_level, scoring_date
-FROM ai_intelligence_output
-WHERE scoring_date = CURRENT_DATE
-ORDER BY recovery_score DESC
-LIMIT 10;
-```
-
-### Check Model History
-```sql
-SELECT version, auc, trained_date, status
-FROM ai_model_registry
-ORDER BY trained_date DESC;
-```
-
-### Customer Profile
-```sql
-SELECT cust_id, behavioral_grade, recovery_effort_level, b_list_status
-FROM customer_behavioral_standing
-LIMIT 5;
-```
-
----
-
-## ⚙️ Configuration
-
-### Environment Variables
-
-```bash
-# Model training threshold (default: 0.50)
-export COLLECTAI_MIN_CV_AUC_TO_DEPLOY=0.50
-
-# Database connection (if not using config/settings.py)
-export DATABASE_URL="postgresql://user:password@localhost/collect_ai"
-```
-
-### Settings File
-Edit `config/settings.py` to customize:
-- Feature columns
-- Model hyperparameters
-- Decision thresholds
-- CBS rules
-
----
-
-## 🆘 Troubleshooting
-
-### Issue: "libomp.dylib not found" (macOS)
-```bash
-brew install libomp
-```
-
-### Issue: "Module 'xgboost' not found"
-```bash
-pip install --upgrade xgboost scikit-learn
-```
-
-### Issue: "Connection to database refused"
-Check PostgreSQL is running:
-```bash
-psql -U postgres -c "SELECT 1;"
-```
-
-### Issue: "AUC below threshold (0.50)"
-- Add more training data (need minimum 500 samples for better signal)
-- Check data quality in `payment_history` table
-- Verify outcome labeling in `outcome_labeler.py`
-
----
-
-## 📈 Next Steps
-
-### Phase 6: MLOps & Monitoring
-- [ ] Implement model drift detection
-- [ ] Setup champion-challenger framework
-- [ ] Create weekly retraining orchestrator
-
-### Phase 7: Production Deployment
-- [ ] Write integration tests
-- [ ] Setup Airflow/cron scheduling
-- [ ] Create production README & deployment guide
-
----
-
-## 📝 License & Contact
-
-CollectAI - Advanced ML-powered Recovery Score Prediction System
-
-For questions or issues, refer to the documentation files:
-- [System Rules](rules-engine.md)
-- [ML Ops Pipeline](ml-ops-pipeline.md)
-- [Scoring Engine](scoring-engine.md)
-- [Flow & Rules](flow-and-rules.md)
-
+📝 *Documented for Phase 7 Production Deployment.*
