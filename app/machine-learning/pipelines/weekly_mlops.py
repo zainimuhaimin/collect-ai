@@ -35,6 +35,8 @@ from config.settings import (  # noqa: E402
     RETRAIN_DECAY_RATE,
     SHADOW_DAYS_MIN,
     AUC_FLOOR,
+    MODEL_TYPE_FEATURE_COLS,
+    MODEL_TYPE_TARGET_COL,
 )
 from src.outcome_labeler import label_historical_scores, get_labeled_dataset  # noqa: E402
 from src.model_monitor import (  # noqa: E402
@@ -55,6 +57,12 @@ from src.model_registry import (  # noqa: E402
     get_performance_history,
     _load_registry,
 )
+
+# Sub-model yang punya training pipeline terpisah (pipelines/train_*.py) dan
+# tidak di-retrain otomatis dari sini — weekly_mlops hanya menjalankan siklus
+# shadow-scoring -> evaluate -> promote untuk challenger yang SUDAH ada
+# (dibuat dengan menjalankan pipeline training-nya masing-masing).
+SUB_MODEL_TYPES = ["self_cure", "roll_forward", "ptp_success"]
 from src.feature_engineering import (  # noqa: E402
     compute_contract_features,
     compute_customer_features,
@@ -136,18 +144,19 @@ def _save_artifact(path: str, artifact: dict):
     joblib.dump(artifact, path)
 
 
-def _count_shadow_days(engine) -> int:
-    """Hitung berapa hari challenger sudah berjalan di shadow mode.
-
-    Dihitung dari MIN(snapshot_date) di tabel shadow_scores —
-    selisih antara tanggal shadow pertama dengan hari ini.
+def _count_shadow_days(engine, model_type: str = "recovery") -> int:
+    """Hitung berapa hari challenger MODEL_TYPE tertentu sudah berjalan di
+    shadow mode. Dihitung dari MIN(snapshot_date) di tabel shadow_scores
+    untuk model_type tsb — selisih antara tanggal shadow pertama dengan
+    hari ini.
     """
     if engine is None:
         return 0
     try:
         with engine.connect() as conn:
             result = conn.execute(
-                text("SELECT MIN(snapshot_date) FROM shadow_scores")
+                text("SELECT MIN(snapshot_date) FROM shadow_scores WHERE model_type = :mt"),
+                {"mt": model_type},
             ).scalar()
         if result is None:
             return 0
@@ -156,6 +165,93 @@ def _count_shadow_days(engine) -> int:
         return max(0, int(days_shadow))
     except Exception:
         return 0
+
+
+def _run_submodel_challenger_cycle(model_type, engine, df_labeled, current_features):
+    """Siklus champion-challenger generik untuk 1 sub-model: drift check,
+    lalu — jika ada challenger yang sudah dibuat lewat pipelines/train_*.py —
+    shadow-scoring, evaluasi, dan promote jika challenger menang.
+
+    Catatan: retrain sub-model TIDAK dipicu otomatis dari sini. Operator
+    menjalankan pipelines/train_self_cure.py (dst) secara terjadwal untuk
+    menghasilkan challenger; fungsi ini hanya mengurus evaluasi & promosinya.
+    Monitoring AUC historis (seperti AUC_FLOOR untuk recovery) belum tersedia
+    untuk sub-model karena scoring_labels belum menyimpan histori skor
+    sub-model — trigger drift tetap dihitung dan dilaporkan sebagai sinyal.
+    """
+    feature_cols = MODEL_TYPE_FEATURE_COLS[model_type]
+    target_col = MODEL_TYPE_TARGET_COL[model_type]
+    result = {"model_type": model_type, "needs_retrain_drift": False, "promoted": False}
+
+    try:
+        champion_path = get_champion_path(model_type=model_type)
+    except FileNotFoundError:
+        print(f"[MLOps:{model_type}] Belum ada champion — jalankan pipelines/train_{model_type}.py dahulu")
+        return result
+
+    if not current_features.empty:
+        try:
+            champion_artifact = joblib.load(champion_path)
+            train_snapshot = champion_artifact.get("training_features_sample", pd.DataFrame())
+            if not train_snapshot.empty:
+                _, needs_retrain_drift = run_drift_detection(train_snapshot, current_features, feature_cols)
+                result["needs_retrain_drift"] = needs_retrain_drift
+                print(f"[MLOps:{model_type}] Drift retrain triggered: {needs_retrain_drift}")
+        except Exception as exc:
+            print(f"[MLOps:{model_type}] Drift check gagal: {exc}")
+
+    challenger_path = get_challenger_path(model_type=model_type)
+    if not challenger_path or not os.path.exists(challenger_path):
+        print(f"[MLOps:{model_type}] Tidak ada challenger aktif")
+        return result
+
+    shadow_days = _count_shadow_days(engine, model_type=model_type)
+    print(f"[MLOps:{model_type}] Challenger shadow days: {shadow_days} (min: {SHADOW_DAYS_MIN})")
+
+    shadow_scores = pd.DataFrame()
+    if not current_features.empty:
+        try:
+            shadow_scores = run_shadow_scoring(
+                current_features, feature_cols, champion_path, challenger_path,
+                engine=engine, model_type=model_type,
+            )
+        except Exception as exc:
+            print(f"[MLOps:{model_type}] Shadow scoring gagal: {exc}")
+
+    if shadow_days < SHADOW_DAYS_MIN:
+        print(f"[MLOps:{model_type}] Evaluasi belum dilakukan — {SHADOW_DAYS_MIN - shadow_days} hari lagi")
+        return result
+
+    if df_labeled.empty or shadow_scores.empty:
+        print(f"[MLOps:{model_type}] Evaluasi dilewati: labeled data atau shadow scores kosong")
+        return result
+
+    try:
+        eval_result = evaluate_champion_vs_challenger(df_labeled, shadow_scores, target_col=target_col)
+        print(f"[MLOps:{model_type}] Evaluation decision: {eval_result.get('decision')}")
+        if eval_result.get("decision") == "PROMOTE_CHALLENGER":
+            promote_challenger(champion_path, challenger_path, model_type=model_type)
+            register_model(
+                champion_path,
+                {
+                    "strategy": "recency_weighted",
+                    "auc": eval_result.get("challenger_auc"),
+                    "evaluated_at": eval_result.get("evaluated_at"),
+                    "promoted_from_challenger": challenger_path,
+                },
+                role="champion",
+                model_type=model_type,
+            )
+            if os.path.exists(challenger_path):
+                os.remove(challenger_path)
+            result["promoted"] = True
+            print(f"[MLOps:{model_type}] ✅ Challenger berhasil dipromote menjadi champion")
+        else:
+            print(f"[MLOps:{model_type}] Champion dipertahankan (decision: {eval_result.get('decision')})")
+    except Exception as exc:
+        print(f"[MLOps:{model_type}] Evaluasi champion-challenger gagal: {exc}")
+
+    return result
 
 
 # ── MAIN ORCHESTRATOR ──────────────────────────────────────────────
@@ -186,7 +282,7 @@ def run_weekly_mlops(reference_date=None):
     print(f"{'=' * 72}")
 
     # ── STEP 1: Label outcome baru ─────────────────────────────────
-    print("\n[MLOps] Step 1/8 — Labeling historical scores...")
+    print("\n[MLOps] Step 1/9 — Labeling historical scores...")
     df_ai_output = _load_df(engine, "SELECT * FROM ai_intelligence_output")
     df_payment = _load_df(engine, "SELECT * FROM payment_history")
 
@@ -194,7 +290,7 @@ def run_weekly_mlops(reference_date=None):
     print(f"[MLOps] New labels appended: {len(new_labels):,}")
 
     # ── STEP 2: Bangun labeled dataset ────────────────────────────
-    print("\n[MLOps] Step 2/8 — Building labeled training set...")
+    print("\n[MLOps] Step 2/9 — Building labeled training set...")
     df_labeled = _build_labeled_training_set(engine)
     if df_labeled.empty:
         print("[MLOps] Belum ada labeled dataset yang bisa dipakai")
@@ -202,7 +298,7 @@ def run_weekly_mlops(reference_date=None):
         print(f"[MLOps] Labeled dataset size: {len(df_labeled):,} records")
 
     # ── STEP 3: Model performance monitoring ──────────────────────
-    print("\n[MLOps] Step 3/8 — Computing model performance...")
+    print("\n[MLOps] Step 3/9 — Computing model performance...")
     perf = (
         compute_model_performance(df_labeled, window_days=30)
         if not df_labeled.empty
@@ -218,7 +314,7 @@ def run_weekly_mlops(reference_date=None):
         print(f"[MLOps] Performance monitor: {perf.get('message', perf.get('status'))}")
 
     # ── STEP 4: Drift detection ────────────────────────────────────
-    print("\n[MLOps] Step 4/8 — Running drift detection...")
+    print("\n[MLOps] Step 4/9 — Running drift detection...")
     drift_results = {}
     needs_retrain_drift = False
     current_features = pd.DataFrame()
@@ -235,22 +331,28 @@ def run_weekly_mlops(reference_date=None):
     except Exception as exc:
         print(f"[MLOps] Gagal load champion artifact: {exc}")
 
-    if champion_path:
+    # current_features dihitung terlepas dari apakah champion recovery sudah
+    # ada — dipakai ulang oleh drift/shadow-scoring recovery MAUPUN ke-3
+    # sub-model (self_cure/roll_forward/ptp_success) di step-step berikutnya.
+    try:
+        df_contract = _load_df(engine, "SELECT * FROM contract_snapshot")
+        df_payment_current = _load_df(engine, "SELECT * FROM payment_history")
+        df_lkp = _load_df(engine, "SELECT * FROM lkp_interaction")
+        df_customer = _load_df(engine, "SELECT * FROM customer_master")
+
+        contract_features = compute_contract_features(
+            df_contract, df_payment_current, df_lkp, ref_date
+        )
+        customer_features = compute_customer_features(
+            df_contract, df_payment_current, df_lkp, df_customer, contract_features
+        )
+        cbs_current = build_cbs(customer_features)
+        current_features = enrich_with_cbs(contract_features, cbs_current)
+    except Exception as exc:
+        print(f"[MLOps] Gagal menghitung current_features: {exc}")
+
+    if champion_path and not current_features.empty:
         try:
-            df_contract = _load_df(engine, "SELECT * FROM contract_snapshot")
-            df_payment_current = _load_df(engine, "SELECT * FROM payment_history")
-            df_lkp = _load_df(engine, "SELECT * FROM lkp_interaction")
-            df_customer = _load_df(engine, "SELECT * FROM customer_master")
-
-            contract_features = compute_contract_features(
-                df_contract, df_payment_current, df_lkp, ref_date
-            )
-            customer_features = compute_customer_features(
-                df_contract, df_payment_current, df_lkp, df_customer, contract_features
-            )
-            cbs_current = build_cbs(customer_features)
-            current_features = enrich_with_cbs(contract_features, cbs_current)
-
             drift_results, needs_retrain_drift = run_drift_detection(
                 train_snapshot, current_features, FEATURE_COLS
             )
@@ -259,7 +361,7 @@ def run_weekly_mlops(reference_date=None):
             print(f"[MLOps] Drift detection gagal: {exc}")
 
     # ── STEP 5: Retrain challenger jika perlu ─────────────────────
-    print("\n[MLOps] Step 5/8 — Evaluating retrain need...")
+    print("\n[MLOps] Step 5/9 — Evaluating retrain need...")
     needs_retrain_perf = (
         perf.get("status") == "ok"
         and perf.get("auc", 1.0) < AUC_FLOOR
@@ -311,7 +413,7 @@ def run_weekly_mlops(reference_date=None):
         print("[MLOps] Retrain diperlukan tapi tidak ada labeled data — dilewati")
 
     # ── STEP 6: Shadow scoring + evaluasi champion-challenger ─────
-    print("\n[MLOps] Step 6/8 — Champion-Challenger evaluation...")
+    print("\n[MLOps] Step 6/9 — Champion-Challenger evaluation...")
     challenger_path = get_challenger_path()
     promoted = False
     eval_result = {}
@@ -388,12 +490,21 @@ def run_weekly_mlops(reference_date=None):
             f"(challenger ada: {challenger_path is not None})"
         )
 
-    # ── STEP 7: Log ke model_monitoring_log ───────────────────────
-    print("\n[MLOps] Step 7/8 — Logging run ke database...")
-    # Ambil version champion aktif dari registry
+    # ── STEP 7/9: Sub-model champion-challenger evaluation ─────────
+    print("\n[MLOps] Step 7/9 — Sub-model (self_cure/roll_forward/ptp_success) evaluation...")
+    submodel_results = []
+    for mtype in SUB_MODEL_TYPES:
+        print(f"\n[MLOps:{mtype}] --------------------------------------------")
+        submodel_results.append(
+            _run_submodel_challenger_cycle(mtype, engine, df_labeled, current_features)
+        )
+
+    # ── STEP 8/9: Log ke model_monitoring_log ───────────────────────
+    print("\n[MLOps] Step 8/9 — Logging run ke database...")
+    # Ambil version champion aktif dari registry (model_type='recovery')
     try:
         registry = _load_registry()
-        champ_entry = registry.get("current_champion") or {}
+        champ_entry = registry.get("model_types", {}).get("recovery", {}).get("current_champion") or {}
         champion_version = champ_entry.get("version")
     except Exception:
         champion_version = None
@@ -421,21 +532,27 @@ def run_weekly_mlops(reference_date=None):
 
     # ── STEP 8: Print ringkasan ────────────────────────────────────
     duration = (datetime.now() - start).total_seconds()
-    print(f"\n[MLOps] Step 8/8 — Summary")
+    print(f"\n[MLOps] Step 9/9 — Summary")
     print(f"{'=' * 72}")
     print(f"  Run date       : {ref_date.date()}")
     print(f"  New labels     : {len(new_labels):,}")
     print(f"  Model AUC      : {perf.get('auc', 'N/A')}")
     print(f"  Retrain needed : {should_retrain}")
-    print(f"  Challenger     : {'created' if challenger_created else 'none'}")
-    print(f"  Promotion      : {'YES' if promoted else 'NO'}")
+    print(f"  Challenger     : {'created' if challenger_created else 'none'} (recovery)")
+    print(f"  Promotion      : {'YES' if promoted else 'NO'} (recovery)")
+    for r in submodel_results:
+        print(
+            f"  {r['model_type']:<13}: drift_retrain={r['needs_retrain_drift']} "
+            f"promoted={r['promoted']}"
+        )
     print(f"  Duration       : {duration:.1f}s")
     print(f"{'=' * 72}")
 
-    if not should_retrain and not challenger_path:
-        print("[MLOps] ✅ No action needed — model stable, no challenger active")
+    if not should_retrain and not challenger_path and not any(r["promoted"] for r in submodel_results):
+        print("[MLOps] ✅ No action needed — semua model stabil, tidak ada challenger aktif")
 
-    get_performance_history(last_n=5)
+    for mtype in ["recovery"] + SUB_MODEL_TYPES:
+        get_performance_history(model_type=mtype, last_n=5)
     print(f"{'=' * 72}\n")
 
     return {
@@ -444,6 +561,7 @@ def run_weekly_mlops(reference_date=None):
         "needs_retrain": should_retrain,
         "challenger_created": challenger_created,
         "promoted": promoted,
+        "submodels": submodel_results,
     }
 
 

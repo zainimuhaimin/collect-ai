@@ -48,6 +48,11 @@ def build_cbs(df_customer_features: pd.DataFrame) -> pd.DataFrame:
     # ── BEHAVIORAL_GRADE ─────────────────────────────────────────
     df["behavioral_grade"] = df["composite_behavioral_score"].apply(_grade_from_score)
 
+    # 1. Override Grade ke C jika self_cure_rate rendah
+    if "self_cure_rate" in df.columns:
+        low_cure = (df["self_cure_rate"] < 0.20) & (df["behavioral_grade"].isin(["A", "B"]))
+        df.loc[low_cure, "behavioral_grade"] = "C"
+
     # Override paksa ke D
     force_d = (
         (df["broken_ptp_count"] >= BROKEN_PTP_BLACKLIST)
@@ -60,15 +65,21 @@ def build_cbs(df_customer_features: pd.DataFrame) -> pd.DataFrame:
     df.loc[force_d, "behavioral_grade"] = "D"
 
     # ── B_LIST_STATUS ────────────────────────────────────────────
+    # B-List juga mencakup jika customer sering mengingkari PTP berturut-turut
+    # (asumsi broken_ptp_count >= 3) atau rpc_rate sangat rendah
     is_blacklist = (
         (df["behavioral_grade"] == "D")
-        | (df["broken_ptp_count"] >= BROKEN_PTP_BLACKLIST)
+        | (df["broken_ptp_count"] >= 3)  # Updated rule from TASK-36
         | (df["historical_default_count"] >= HISTORICAL_DEFAULT_BLACKLIST)
         | (
             (df["ptp_reliability_index"] < PTP_RELIABILITY_BLACKLIST)
             & (df["sum_ptp_made"] >= MIN_PTP_MADE_FOR_BLACKLIST)
         )
     )
+    if "rpc_rate" in df.columns:
+        from config.settings import RPC_RATE_LOW_THRESHOLD
+        is_blacklist = is_blacklist | (df["rpc_rate"] < RPC_RATE_LOW_THRESHOLD)
+        
     df["b_list_status"] = np.where(is_blacklist, "Y", "N")
 
     # ── RECOVERY_EFFORT_LEVEL ────────────────────────────────────

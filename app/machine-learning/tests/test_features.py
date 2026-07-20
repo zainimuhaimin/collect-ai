@@ -371,5 +371,137 @@ class TestEnrichWithCbs:
             assert col in result.columns, f"Kolom '{col}' dari FEATURE_COLS hilang di output"
 
 
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+# ── TASK-33/34/35: New Features ──────────────────────────────────────
+
+class TestNewContractFeatures:
+    """Tests untuk fitur baru TASK-33, TASK-34, TASK-35."""
+
+    def _base_contract(self, prev_cycle="C1", cycle="C2", loan_amount=100_000_000,
+                        prnc_ots=30_000_000, intr_ots=0, maturity_date=None):
+        today = pd.Timestamp.today().normalize()
+        if maturity_date is None:
+            maturity_date = (today + pd.Timedelta(days=200)).strftime("%Y-%m-%d")
+        return pd.DataFrame([{
+            "contract_no": "C999",
+            "cust_id": "CUST999",
+            "cycle": cycle,
+            "dpd_current": 5,
+            "prnc_ots": prnc_ots,
+            "intr_ots": intr_ots,
+            "prev_cycle": prev_cycle,
+            "loan_amount": loan_amount,
+            "installment_amount": 2_000_000,
+            "maturity_date": maturity_date,
+        }])
+
+    def test_cycle_direction_worsening(self):
+        """C1 → C2: cycle_direction = +1 (makin parah)."""
+        df_c = self._base_contract(prev_cycle="C1", cycle="C2")
+        result = compute_contract_features(df_c, pd.DataFrame(), pd.DataFrame())
+        assert int(result["cycle_direction"].iloc[0]) == 1
+
+    def test_cycle_direction_improving(self):
+        """C2 → C1: cycle_direction = -1 (membaik)."""
+        df_c = self._base_contract(prev_cycle="C2", cycle="C1")
+        result = compute_contract_features(df_c, pd.DataFrame(), pd.DataFrame())
+        assert int(result["cycle_direction"].iloc[0]) == -1
+
+    def test_days_to_maturity_positive(self):
+        """Maturity di masa depan → days_to_maturity > 0."""
+        today = pd.Timestamp.today().normalize()
+        future = (today + pd.Timedelta(days=90)).strftime("%Y-%m-%d")
+        df_c = self._base_contract(maturity_date=future)
+        result = compute_contract_features(df_c, pd.DataFrame(), pd.DataFrame())
+        assert result["days_to_maturity"].iloc[0] > 0
+
+    def test_days_to_maturity_past(self):
+        """Maturity sudah lewat → di-clip ke 0."""
+        past = "2020-01-01"
+        df_c = self._base_contract(maturity_date=past)
+        result = compute_contract_features(df_c, pd.DataFrame(), pd.DataFrame())
+        assert int(result["days_to_maturity"].iloc[0]) == 0
+
+    def test_rpc_rate_calculation(self):
+        """3 dari 5 LKP berhasil RPC → rpc_rate = 0.6."""
+        df_c = self._base_contract()
+        today = pd.Timestamp.today().normalize()
+        rows = []
+        for i in range(5):
+            rows.append({
+                "lkp_id": f"L{i:03d}",
+                "contract_no": "C999",
+                "action_date": today - pd.Timedelta(days=i + 1),
+                "promise_date": today + pd.Timedelta(days=7),
+                "result_code": "Bayar",
+                "treatment_type": "Deskcoll",
+                "interaction_score": 3,
+                "rpc_flag": (i < 3),  # 3 True, 2 False
+            })
+        df_l = pd.DataFrame(rows)
+        result = compute_contract_features(df_c, pd.DataFrame(), df_l)
+        assert float(result["rpc_rate"].iloc[0]) == pytest.approx(0.6, abs=0.01)
+
+    def test_ptp_status_direct(self):
+        """PTP_STATUS='BROKEN' di LKP langsung terhitung di ptp_fulfillment_rate
+        tanpa perlu mencocokkan payment window."""
+        df_c = self._base_contract()
+        today = pd.Timestamp.today().normalize()
+        # 1 PTP OPEN, 1 PTP BROKEN → total_ptp_made = 2 (dari result_code)
+        # PTP kept dihitung dari payment window, bukan ptp_status
+        # → test ini memastikan open_ptp_count terhitung dari ptp_status
+        df_l = pd.DataFrame([
+            {
+                "lkp_id": "L001",
+                "contract_no": "C999",
+                "action_date": today - pd.Timedelta(days=3),
+                "promise_date": today + pd.Timedelta(days=4),
+                "result_code": "PTP",
+                "treatment_type": "Deskcoll",
+                "interaction_score": 3,
+                "ptp_status": "OPEN",
+            },
+            {
+                "lkp_id": "L002",
+                "contract_no": "C999",
+                "action_date": today - pd.Timedelta(days=10),
+                "promise_date": today - pd.Timedelta(days=3),
+                "result_code": "PTP",
+                "treatment_type": "Deskcoll",
+                "interaction_score": 3,
+                "ptp_status": "BROKEN",
+            },
+        ])
+        result = compute_contract_features(df_c, pd.DataFrame(), df_l)
+        # open_ptp_count harus = 1 (hanya yang OPEN)
+        assert int(result["open_ptp_count"].iloc[0]) == 1
+        # total_ptp_made = 2 (kedua result_code = PTP)
+        assert int(result["total_ptp_made"].iloc[0]) == 2
+
+    def test_self_cure_rate(self):
+        """2 dari 3 payment punya self_cure_flag=True → self_cure_rate ≈ 0.667."""
+        df_c = self._base_contract()
+        today = pd.Timestamp.today().normalize()
+        df_p = pd.DataFrame([
+            {"payment_id": "P001", "contract_no": "C999",
+             "actual_pay_date": today - pd.Timedelta(days=30),
+             "pay_status": "Full", "delay_days": 0, "self_cure_flag": True},
+            {"payment_id": "P002", "contract_no": "C999",
+             "actual_pay_date": today - pd.Timedelta(days=60),
+             "pay_status": "Full", "delay_days": 0, "self_cure_flag": True},
+            {"payment_id": "P003", "contract_no": "C999",
+             "actual_pay_date": today - pd.Timedelta(days=90),
+             "pay_status": "Partial", "delay_days": 5, "self_cure_flag": False},
+        ])
+        result = compute_contract_features(df_c, df_p, pd.DataFrame())
+        assert float(result["self_cure_rate"].iloc[0]) == pytest.approx(2/3, abs=0.01)
+
+    def test_recovery_ratio(self):
+        """loan=100jt, total_ots=30jt → recovery_ratio = (100-30)/100 = 0.70."""
+        df_c = self._base_contract(loan_amount=100_000_000, prnc_ots=30_000_000, intr_ots=0)
+        result = compute_contract_features(df_c, pd.DataFrame(), pd.DataFrame())
+        assert float(result["recovery_ratio"].iloc[0]) == pytest.approx(0.70, abs=0.01)

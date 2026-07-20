@@ -17,6 +17,10 @@ from config.settings import (
     MAX_INCOME_DEBT_RATIO,
     OTS_TIER_RENDAH,
     OTS_TIER_TINGGI,
+    SELF_CURE_PROB_THRESHOLD,
+    ROLL_FORWARD_HIGH_RISK,
+    RPC_RATE_LOW_THRESHOLD,
+    DAYS_TO_MATURITY_SHORT,
 )
 
 
@@ -42,10 +46,16 @@ def apply_risk_segment(df: pd.DataFrame) -> pd.DataFrame:
         & (score < SCORE_THRESHOLD_CANNOT_PAY)
         & ((broken_ptp > 0) | (idr > MAX_INCOME_DEBT_RATIO))
     )
+    # cond_self_cure: recovery >= 0.70 AND dpd <= 7 AND payment_rate >= 0.80 AND self_cure_probability >= 0.70
+    if "self_cure_probability" in out.columns:
+        prob_sc = pd.to_numeric(out["self_cure_probability"], errors="coerce").fillna(0)
+    else:
+        prob_sc = pd.Series(0.0, index=out.index)
     cond_self = (
         (score >= SCORE_THRESHOLD_SELF_CURE)
         & (dpd <= MAX_DPD_FOR_SELFCURE)
         & (pay_rate >= MIN_PAYMENT_RATE_SELFCURE)
+        & (prob_sc >= SELF_CURE_PROB_THRESHOLD)
     )
 
     out["risk_segment"] = np.select(
@@ -103,6 +113,25 @@ def apply_nba(df: pd.DataFrame, df_cbs: pd.DataFrame | None = None) -> pd.DataFr
         do_override = sens_rank > nba_rank
         out.loc[do_override, "nba_recommendation"] = sens[do_override]
 
+    # Override baru 1: nasabah self-cure tinggi → WA saja
+    if "self_cure_probability" in out.columns:
+        sc_high = out["self_cure_probability"] >= SELF_CURE_PROB_THRESHOLD
+        out.loc[sc_high, "nba_recommendation"] = "WA"
+
+    # Override baru 2: RPC rate sangat rendah → Visit untuk verify alamat
+    if "rpc_rate" in out.columns:
+        rpc_low = out["rpc_rate"] < RPC_RATE_LOW_THRESHOLD
+        
+        # apply only if current rank < Visit (which is 3)
+        nba_r = out["nba_recommendation"].map(CHANNEL_RANK).fillna(0)
+        to_visit = rpc_low & (nba_r < 3)
+        out.loc[to_visit, "nba_recommendation"] = "Visit"
+
+    # Override baru 3: near-maturity + saldo kecil → WA cukup
+    if "days_to_maturity" in out.columns and "ambc" in out.columns and "installment_amount" in out.columns:
+        near_mat = (out["days_to_maturity"] < DAYS_TO_MATURITY_SHORT) & (out["ambc"] < out["installment_amount"] * 2)
+        out.loc[near_mat, "nba_recommendation"] = "WA"
+
     return out
 
 
@@ -133,9 +162,21 @@ def apply_priority(df: pd.DataFrame) -> pd.DataFrame:
 
     ots = pd.to_numeric(out.get("total_ots", 0), errors="coerce").fillna(0)
     tier = ots.apply(_ots_tier)
-    out["priority_level"] = [
+    base_priorities = [
         matrix.get((seg, t), "Medium")
         for seg, t in zip(out["risk_segment"].astype(str), tier)
     ]
+    out["priority_level"] = base_priorities
+
+    if "roll_forward_risk" in out.columns:
+        rfr_high = out["roll_forward_risk"] >= ROLL_FORWARD_HIGH_RISK
+        escalation_map = {
+            "Low": "Medium",
+            "Medium": "High",
+            "High": "Critical",
+            "Critical": "Critical",
+        }
+        # escalate priority if high roll forward risk
+        out.loc[rfr_high, "priority_level"] = out.loc[rfr_high, "priority_level"].map(escalation_map).fillna(out["priority_level"])
 
     return out

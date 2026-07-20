@@ -99,8 +99,9 @@ class TestApplyRiskSegment:
         assert result["risk_segment"].iloc[0] == "Cannot Pay"
 
     def test_self_cure_high_score(self):
-        """score >= 0.70 AND dpd <= 7 AND payment_rate >= 0.80 → Self-cure."""
+        """score >= 0.70 AND dpd <= 7 AND payment_rate >= 0.80 AND self_cure_probability >= 0.70 → Self-cure."""
         df = _base_df(recovery_score=0.80, dpd_current=5, payment_rate=0.85)
+        df["self_cure_probability"] = 0.80  # New requirement: must have high prob
         result = apply_risk_segment(df)
         assert result["risk_segment"].iloc[0] == "Self-cure"
 
@@ -390,5 +391,113 @@ class TestRunQualityCheck:
         assert "critical_pct" in result
 
 
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+# ── TASK-42: Sub-Model Business Rules Tests ───────────────────────────
+
+class TestSubModelBusinessRules:
+    """Tests untuk perubahan business rules berdasarkan sub-model scores."""
+
+    def _base_selfcure_candidate(self, self_cure_probability=0.80):
+        """Nasabah yang memenuhi semua syarat Self-cure."""
+        return pd.DataFrame([{
+            "contract_no": "C999",
+            "cust_id": "CUST999",
+            "recovery_score": 0.75,         # >= 0.70 ✓
+            "dpd_current": 5,               # <= 7 ✓
+            "payment_rate": 0.90,           # >= 0.80 ✓
+            "self_cure_probability": self_cure_probability,
+            "rejection_count": 0,
+            "last_result_code_encoded": 3,
+            "broken_ptp_count": 0,
+            "income_debt_ratio": 1.0,
+        }])
+
+    def test_self_cure_needs_high_prob(self):
+        """prob_self_cure=0.50 (di bawah threshold 0.70) → bukan Self-cure meski skor lain OK."""
+        df = self._base_selfcure_candidate(self_cure_probability=0.50)
+        result = apply_risk_segment(df)
+        assert result["risk_segment"].iloc[0] != "Self-cure", \
+            "Seharusnya bukan Self-cure karena self_cure_probability < 0.70"
+
+    def test_self_cure_with_high_prob(self):
+        """Semua syarat terpenuhi termasuk prob >= 0.70 → Self-cure."""
+        df = self._base_selfcure_candidate(self_cure_probability=0.80)
+        result = apply_risk_segment(df)
+        assert result["risk_segment"].iloc[0] == "Self-cure"
+
+    def test_priority_escalation_roll_fwd(self):
+        """Medium priority + roll_forward_risk=0.80 → naik menjadi High."""
+        df = pd.DataFrame([{
+            "contract_no": "C999",
+            "cust_id": "CUST999",
+            "risk_segment": "Can Pay",
+            "total_ots": 10_000_000,        # mid tier → base = Medium
+            "roll_forward_risk": 0.80,      # >= 0.75 → escalate
+        }])
+        result = apply_priority(df)
+        assert result["priority_level"].iloc[0] == "High", \
+            "Priority harusnya naik dari Medium ke High karena roll_forward_risk >= 0.75"
+
+    def test_priority_no_escalation_low_roll_fwd(self):
+        """roll_forward_risk=0.50 (< 0.75) → tidak ada eskalasi."""
+        df = pd.DataFrame([{
+            "contract_no": "C999",
+            "cust_id": "CUST999",
+            "risk_segment": "Can Pay",
+            "total_ots": 10_000_000,        # mid tier → base = Medium
+            "roll_forward_risk": 0.50,      # < 0.75 → tidak escalate
+        }])
+        result = apply_priority(df)
+        assert result["priority_level"].iloc[0] == "Medium"
+
+    def test_nba_selfcure_override(self):
+        """self_cure_probability=0.80 → NBA = WA, override semua aturan sebelumnya."""
+        df = pd.DataFrame([{
+            "contract_no": "C999",
+            "cust_id": "CUST999",
+            "risk_segment": "Cannot Pay",   # rule biasa → Deskcoll atau Visit
+            "cycle_encoded": 2,             # rule → Visit
+            "total_ots": 5_000_000,
+            "historical_default_count": 0,
+            "self_cure_probability": 0.80,  # override → WA
+        }])
+        result = apply_nba(df)
+        assert result["nba_recommendation"].iloc[0] == "WA", \
+            "NBA harusnya WA karena self_cure_probability >= 0.70"
+
+    def test_nba_low_rpc_visit(self):
+        """rpc_rate=0.10 (< 0.30) → minimum Visit, bukan WA atau Deskcoll."""
+        df = pd.DataFrame([{
+            "contract_no": "C999",
+            "cust_id": "CUST999",
+            "risk_segment": "Can Pay",      # base → WA (cycle <= 1)
+            "cycle_encoded": 0,
+            "total_ots": 3_000_000,
+            "historical_default_count": 0,
+            "rpc_rate": 0.10,               # < 0.30 → minimum Visit
+            # no self_cure_probability → tidak ada override-1
+        }])
+        result = apply_nba(df)
+        assert result["nba_recommendation"].iloc[0] == "Visit", \
+            "NBA harusnya minimum Visit karena rpc_rate < 0.30"
+
+    def test_nba_near_maturity_small_balance(self):
+        """days_to_maturity < 60 AND ambc kecil → NBA = WA."""
+        df = pd.DataFrame([{
+            "contract_no": "C999",
+            "cust_id": "CUST999",
+            "risk_segment": "Cannot Pay",   # rule biasa → Deskcoll
+            "cycle_encoded": 1,
+            "total_ots": 5_000_000,
+            "historical_default_count": 0,
+            "days_to_maturity": 20,         # < 60 ✓
+            "ambc": 1_500_000,              # < installment_amount * 2 = 4_000_000 ✓
+            "installment_amount": 2_000_000,
+        }])
+        result = apply_nba(df)
+        assert result["nba_recommendation"].iloc[0] == "WA", \
+            "NBA harusnya WA karena near-maturity dengan saldo kecil"

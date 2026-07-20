@@ -35,7 +35,14 @@ def _upsert_ai_output(engine, df_publish: pd.DataFrame):
     cols = [
         "contract_no", "cust_id", "recovery_score", "confidence_level", "confidence_category",
         "risk_segment", "nba_recommendation", "priority_level", "scoring_date", "updated_at",
+        "self_cure_probability", "roll_forward_risk", "ptp_success_probability",
     ]
+    
+    # Fill missing new columns with NULL for fallback if they don't exist
+    for c in ["self_cure_probability", "roll_forward_risk", "ptp_success_probability"]:
+        if c not in df_publish.columns:
+            df_publish[c] = None
+
     payload = df_publish[cols].copy()
 
     with engine.begin() as conn:
@@ -178,6 +185,19 @@ def run_daily_scoring(reference_date=None):
     # Step 10
     print("\n[Daily Scoring] Success")
     print(f"  Contracts scored: {len(df_scored):,}")
+    
+    # MULTI-SCORE SUMMARY
+    print(f"\n  MULTI-SCORE SUMMARY:")
+    print(f"  Avg RECOVERY_SCORE       : {df_scored.get('recovery_score', pd.Series([0])).mean():.4f}")
+    if "self_cure_probability" in df_scored.columns:
+        print(f"  Avg SELF_CURE_PROB       : {df_scored['self_cure_probability'].mean():.4f}")
+        print(f"  Will Self-Cure (prob>0.7): {(df_scored['self_cure_probability']>=0.70).sum():,}")
+    if "roll_forward_risk" in df_scored.columns:
+        print(f"  Avg ROLL_FORWARD_RISK    : {df_scored['roll_forward_risk'].mean():.4f}")
+        print(f"  High Roll Forward Risk   : {(df_scored['roll_forward_risk']>=0.75).sum():,}")
+    if "ptp_success_probability" in df_scored.columns:
+        print(f"  Avg PTP_SUCCESS_PROB     : {df_scored['ptp_success_probability'].mean():.4f}")
+
     print(f"  Segment breakdown: {segment_counts}")
     print(f"  Priority breakdown: {priority_counts}")
 
@@ -185,4 +205,7 @@ def run_daily_scoring(reference_date=None):
 
 
 if __name__ == "__main__":
-    run_daily_scoring()
+    if len(sys.argv) > 1:
+        run_daily_scoring(sys.argv[1])
+    else:
+        run_daily_scoring()

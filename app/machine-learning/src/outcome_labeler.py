@@ -126,6 +126,49 @@ def label_historical_scores(
     )
     to_label["labeled_date"] = today
 
+    # 1. actual_self_cure
+    def _label_self_cure(r):
+        contract_no = r["contract_no"]
+        scoring_date = r["scoring_date"]
+        sub = p[p["contract_no"] == contract_no]
+        if sub.empty:
+            return 0
+        end = scoring_date + pd.Timedelta(days=label_window)
+        mask = (
+            sub["pay_status"].isin(["Full", "Partial"])
+            & (sub["actual_pay_date"] > scoring_date)
+            & (sub["actual_pay_date"] <= end)
+            & (sub.get("self_cure_flag", False) == True)
+        )
+        return int(mask.any())
+
+    to_label["actual_self_cure"] = to_label.apply(_label_self_cure, axis=1)
+
+    # 3. actual_ptp_kept
+    # Load LKP from engine if possible
+    df_lkp = pd.DataFrame()
+    if engine is not None:
+        try:
+            df_lkp = pd.read_sql("SELECT * FROM lkp_interaction", engine)
+            df_lkp.columns = [c.lower() for c in df_lkp.columns]
+        except Exception:
+            pass
+
+    if not df_lkp.empty and "ptp_status" in df_lkp.columns:
+        ptp_kept_contracts = set(
+            df_lkp[
+                (df_lkp["result_code"] == "PTP") &
+                (df_lkp["ptp_status"] == "KEPT")
+            ]["contract_no"].unique()
+        )
+        to_label["actual_ptp_kept"] = to_label["contract_no"].isin(ptp_kept_contracts).astype(int)
+    else:
+        to_label["actual_ptp_kept"] = np.nan
+
+    # 2. actual_roll_forward
+    # Proxy: for now set to NaN as it requires next period snapshot. We'll populate if we can load it.
+    to_label["actual_roll_forward"] = np.nan
+
     n = len(to_label)
     n_paid = int(to_label["actual_paid"].sum())
     print(f"[Labeler] {n:,} records baru dilabeli, paid={n_paid:,} ({n_paid/n:.1%})")
@@ -134,6 +177,7 @@ def label_historical_scores(
         cols = [
             "contract_no", "cust_id", "scoring_date", "recovery_score",
             "risk_segment", "actual_paid", "labeled_date",
+            "actual_self_cure", "actual_roll_forward", "actual_ptp_kept"
         ]
         to_label[cols].to_sql(
             "scoring_labels", engine, if_exists="append", index=False

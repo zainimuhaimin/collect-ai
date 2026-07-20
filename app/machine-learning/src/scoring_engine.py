@@ -8,7 +8,12 @@ import pandas as pd
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config.settings import FEATURE_COLS
+from config.settings import (
+    FEATURE_COLS,
+    QC_WONT_PAY_MAX_PCT,
+    QC_SELF_CURE_MIN_PCT,
+    QC_CRITICAL_MAX_PCT,
+)
 
 
 CONF_KEY_FEATURES = [
@@ -28,25 +33,61 @@ def _prepare_features(df: pd.DataFrame, feature_cols: list[str]) -> pd.DataFrame
     return out[feature_cols].apply(pd.to_numeric, errors="coerce").fillna(0.0)
 
 
-def score_contracts(df_features_enriched: pd.DataFrame, model_path: str) -> pd.DataFrame:
-    artifact = joblib.load(model_path)
-    if isinstance(artifact, dict):
-        model = artifact.get("model")
-        feature_cols = artifact.get("feature_cols", FEATURE_COLS)
-    else:
-        model = artifact
-        feature_cols = FEATURE_COLS
-
-    if model is None:
-        raise ValueError("Model artifact tidak valid: kunci 'model' tidak ditemukan")
-
-    X = _prepare_features(df_features_enriched, feature_cols)
-    pred = model.predict_proba(X)[:, 1]
+def score_contracts(df_features_enriched: pd.DataFrame, champion_path: str = None) -> pd.DataFrame:
+    from config.settings import (
+        CHAMPION_MODEL_PATH, SELF_CURE_MODEL_PATH,
+        ROLL_FORWARD_MODEL_PATH, PTP_SUCCESS_MODEL_PATH
+    )
+    if champion_path is None:
+        champion_path = CHAMPION_MODEL_PATH
 
     out = df_features_enriched.copy()
-    out["recovery_score"] = np.clip(np.round(pred, 4), 0.0, 1.0)
+
+    def _score_model(path, col_name, invert=False):
+        if not os.path.exists(path):
+            out[col_name] = np.nan
+            return
+        artifact = joblib.load(path)
+        if isinstance(artifact, dict):
+            model = artifact.get("model")
+            feature_cols = artifact.get("feature_cols", FEATURE_COLS)
+        else:
+            model = artifact
+            feature_cols = FEATURE_COLS
+
+        if model is None:
+            out[col_name] = np.nan
+            return
+
+        X = _prepare_features(df_features_enriched, feature_cols)
+        pred = model.predict_proba(X)[:, 1]
+        if invert:
+            pred = 1.0 - pred
+        out[col_name] = np.clip(np.round(pred, 4), 0.0, 1.0)
+
+    # 1. Recovery Score (Champion)
+    _score_model(champion_path, "recovery_score")
     if out["recovery_score"].isna().any():
         raise ValueError("Terdapat NULL pada recovery_score")
+
+    # 2. Self Cure Score
+    # Path sub-model TIDAK di-resolve lewat registry (berbeda dari recovery) —
+    # promote_challenger()/rollback_to_previous() untuk model_type ini selalu
+    # menulis ke path tetap SELF_CURE_MODEL_PATH ini juga, jadi hasilnya sama;
+    # dipertahankan langsung dari settings agar tetap mudah di-mock di test
+    # (lihat tests/test_scoring.py::test_missing_submodel_graceful).
+    _score_model(SELF_CURE_MODEL_PATH, "self_cure_probability")
+
+    # 3. Roll Forward Score
+    # Model roll_forward ditraining untuk memprediksi P(actual_paid=1) pada
+    # populasi cycle>=1 (lihat train_roll_forward.py). ROLL_FORWARD_RISK harus
+    # merepresentasikan risiko MEMBURUK (tidak bayar), jadi hasilnya di-invert:
+    # P(tidak bayar) = 1 - P(bayar).
+    _score_model(ROLL_FORWARD_MODEL_PATH, "roll_forward_risk", invert=True)
+
+    # 4. PTP Success Score
+    _score_model(PTP_SUCCESS_MODEL_PATH, "ptp_success_probability")
+
     return out
 
 
@@ -114,9 +155,9 @@ def run_quality_check(df_output: pd.DataFrame):
     critical_pct = float((df["priority_level"] == "Critical").sum() / total)
 
     dist_severity = "soft" if is_small_batch else "hard"
-    checks.append(("wont_pay_pct<=30%", wont_pct <= 0.30, dist_severity))
-    checks.append(("self_cure_pct>=5%", self_pct >= 0.05, dist_severity))
-    checks.append(("critical_pct<=20%", critical_pct <= 0.20, dist_severity))
+    checks.append((f"wont_pay_pct<={QC_WONT_PAY_MAX_PCT:.0%}", wont_pct <= QC_WONT_PAY_MAX_PCT, dist_severity))
+    checks.append((f"self_cure_pct>={QC_SELF_CURE_MIN_PCT:.0%}", self_pct >= QC_SELF_CURE_MIN_PCT, dist_severity))
+    checks.append((f"critical_pct<={QC_CRITICAL_MAX_PCT:.0%}", critical_pct <= QC_CRITICAL_MAX_PCT, dist_severity))
 
     # Consistency soft check
     if "cbs_exists" in df.columns:
@@ -124,6 +165,26 @@ def run_quality_check(df_output: pd.DataFrame):
     else:
         consistency_ok = True
     checks.append(("cust_exists_in_cbs", consistency_ok, "soft"))
+
+    # Range check untuk score baru
+    for col in ['self_cure_probability', 'roll_forward_risk', 'ptp_success_probability']:
+        if col in df.columns and df[col].notna().any():
+            range_ok_sub = bool(df[col].dropna().between(0, 1).all())
+            checks.append((f"range_{col}", range_ok_sub, "hard"))
+
+    # Konsistensi check: Self-cure harus punya self_cure_probability tinggi
+    selfcure_rows = df[df['risk_segment'] == 'Self-cure']
+    if len(selfcure_rows) > 0 and 'self_cure_probability' in df.columns:
+        avg_sc_prob = selfcure_rows['self_cure_probability'].mean()
+        checks.append(("self_cure_segment_prob>=0.5", bool(avg_sc_prob >= 0.50), "soft"))
+
+    # Roll forward: Won't Pay harus punya roll_forward_risk rata-rata lebih tinggi dari Self-cure
+    if 'roll_forward_risk' in df.columns and len(selfcure_rows) > 0:
+        wont_pay_rows = df[df['risk_segment'] == "Won't Pay"]
+        if len(wont_pay_rows) > 0:
+            wont_pay_rfr = wont_pay_rows['roll_forward_risk'].mean()
+            selfcure_rfr = selfcure_rows['roll_forward_risk'].mean()
+            checks.append(("wont_pay_rfr>self_cure_rfr", bool(wont_pay_rfr >= selfcure_rfr), "soft"))
 
     print("\n[QC] Summary")
     hard_failed = []

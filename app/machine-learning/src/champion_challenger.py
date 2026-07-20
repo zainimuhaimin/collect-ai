@@ -1,4 +1,10 @@
-"""Champion-Challenger workflow untuk CollectAI MLOps."""
+"""Champion-Challenger workflow untuk CollectAI MLOps.
+
+Generik untuk ke-4 model_type (recovery, self_cure, roll_forward,
+ptp_success) — setiap fungsi menerima parameter ``model_type`` supaya shadow
+scoring, evaluasi, dan promotion tercatat terpisah per model_type di
+registry dan di tabel shadow_scores (kolom ``model_type``).
+"""
 from __future__ import annotations
 
 import os
@@ -13,7 +19,7 @@ from sklearn.metrics import roc_auc_score
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.settings import ARCHIVE_DIR, MIN_AUC_IMPROVEMENT, MIN_SAMPLES_FOR_EVAL  # noqa: E402
-from src.model_registry import _load_registry, _save_registry  # noqa: E402
+from src.model_registry import _load_registry, _save_registry, DEFAULT_MODEL_TYPE  # noqa: E402
 
 
 def _load_artifact(path: str):
@@ -46,6 +52,7 @@ def run_shadow_scoring(
     champion_path: str,
     challenger_path: str,
     engine=None,
+    model_type: str = DEFAULT_MODEL_TYPE,
 ) -> pd.DataFrame:
     """Score dataset dengan champion dan challenger secara paralel."""
     champ_artifact, champ_model, champ_cols = _load_artifact(champion_path)
@@ -61,8 +68,9 @@ def run_shadow_scoring(
     out = df[["contract_no", "cust_id", "champion_score", "challenger_score"]].copy()
     out["score_delta"] = (out["challenger_score"] - out["champion_score"]).round(4)
     out["snapshot_date"] = datetime.today().date()
+    out["model_type"] = model_type
 
-    print(f"[Shadow Scoring] {len(out):,} contracts")
+    print(f"[Shadow Scoring:{model_type}] {len(out):,} contracts")
     print(f"  Champion avg score   : {out['champion_score'].mean():.4f}")
     print(f"  Challenger avg score : {out['challenger_score'].mean():.4f}")
     print(f"  Avg delta            : {out['score_delta'].mean():+.4f}")
@@ -71,7 +79,7 @@ def run_shadow_scoring(
         try:
             out.to_sql("shadow_scores", engine, if_exists="append", index=False)
         except Exception as exc:
-            print(f"[Shadow Scoring] append shadow_scores skipped: {exc}")
+            print(f"[Shadow Scoring:{model_type}] append shadow_scores skipped: {exc}")
 
     return out
 
@@ -81,8 +89,14 @@ def evaluate_champion_vs_challenger(
     df_shadow_scores: pd.DataFrame,
     min_samples: int = MIN_SAMPLES_FOR_EVAL,
     min_auc_improvement: float = MIN_AUC_IMPROVEMENT,
+    target_col: str = "actual_paid",
 ):
-    """Bandingkan champion dan challenger berdasarkan actual outcome."""
+    """Bandingkan champion dan challenger berdasarkan actual outcome.
+
+    ``target_col`` dipilih sesuai model_type yang dievaluasi (mis.
+    ``actual_self_cure`` untuk model_type='self_cure'), lihat
+    config.settings.MODEL_TYPE_TARGET_COL.
+    """
     if df_labeled is None or df_labeled.empty or df_shadow_scores is None or df_shadow_scores.empty:
         return {"decision": "NO_EVALUATION", "reason": "missing_data"}
 
@@ -91,8 +105,9 @@ def evaluate_champion_vs_challenger(
     shadow = df_shadow_scores.copy()
     shadow.columns = [c.lower() for c in shadow.columns]
 
-    if "contract_no" not in labeled.columns or "actual_paid" not in labeled.columns:
-        return {"decision": "NO_EVALUATION", "reason": "missing_required_columns"}
+    target_col = target_col.lower()
+    if "contract_no" not in labeled.columns or target_col not in labeled.columns:
+        return {"decision": "NO_EVALUATION", "reason": f"missing_required_columns ({target_col})"}
 
     grouped_shadow = (
         shadow.sort_values("snapshot_date")
@@ -101,15 +116,15 @@ def evaluate_champion_vs_challenger(
     )
 
     eval_df = labeled.merge(grouped_shadow, on="contract_no", how="inner")
-    eval_df = eval_df.dropna(subset=["actual_paid", "champion_score", "challenger_score"])
+    eval_df = eval_df.dropna(subset=[target_col, "champion_score", "challenger_score"])
 
     n = len(eval_df)
     if n < min_samples:
         return {"decision": "INSUFFICIENT_DATA", "n_samples": n}
-    if eval_df["actual_paid"].nunique() < 2:
+    if eval_df[target_col].nunique() < 2:
         return {"decision": "INSUFFICIENT_LABEL_VARIANCE", "n_samples": n}
 
-    y_true = pd.to_numeric(eval_df["actual_paid"], errors="coerce").fillna(0).astype(int)
+    y_true = pd.to_numeric(eval_df[target_col], errors="coerce").fillna(0).astype(int)
     champ_auc = roc_auc_score(y_true, pd.to_numeric(eval_df["champion_score"], errors="coerce").fillna(0.0))
     chal_auc = roc_auc_score(y_true, pd.to_numeric(eval_df["challenger_score"], errors="coerce").fillna(0.0))
     delta = chal_auc - champ_auc
@@ -120,7 +135,7 @@ def evaluate_champion_vs_challenger(
 
     print("\n[Champion vs Challenger]")
     print(f"  n_samples       : {n:,}")
-    print(f"  Actual paid rate: {actual_rate:.1%}")
+    print(f"  Actual rate     : {actual_rate:.1%}")
     print(f"  Champion AUC    : {champ_auc:.4f} (calibration gap: {champ_calib:.4f})")
     print(f"  Challenger AUC  : {chal_auc:.4f} (calibration gap: {chal_calib:.4f})")
     print(f"  AUC Delta       : {delta:+.4f}")
@@ -144,8 +159,17 @@ def evaluate_champion_vs_challenger(
     }
 
 
-def promote_challenger(champion_path: str, challenger_path: str, backup_dir: str = ARCHIVE_DIR):
-    """Promote challenger menjadi champion baru dan arsipkan champion lama."""
+def promote_challenger(
+    champion_path: str,
+    challenger_path: str,
+    backup_dir: str = ARCHIVE_DIR,
+    model_type: str = DEFAULT_MODEL_TYPE,
+):
+    """Promote challenger menjadi champion baru dan arsipkan champion lama.
+
+    Registry di-update per model_type supaya versioning masing-masing model
+    tidak saling tercampur.
+    """
     os.makedirs(backup_dir, exist_ok=True)
     if not os.path.exists(champion_path):
         raise FileNotFoundError(f"Champion model tidak ditemukan: {champion_path}")
@@ -153,21 +177,24 @@ def promote_challenger(champion_path: str, challenger_path: str, backup_dir: str
         raise FileNotFoundError(f"Challenger model tidak ditemukan: {challenger_path}")
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_path = os.path.join(backup_dir, f"recovery_model_champion_{timestamp}.pkl")
+    backup_path = os.path.join(backup_dir, f"{model_type}_model_champion_{timestamp}.pkl")
     shutil.copy2(champion_path, backup_path)
     shutil.copy2(challenger_path, champion_path)
 
     registry = _load_registry()
-    challenger_entry = registry.get("current_challenger")
+    bucket = registry.setdefault("model_types", {}).setdefault(
+        model_type, {"current_champion": None, "current_challenger": None, "history": []}
+    )
+    challenger_entry = bucket.get("current_challenger")
     if challenger_entry:
-        registry["current_champion"] = {
+        bucket["current_champion"] = {
             **challenger_entry,
             "role": "champion",
             "registered": datetime.now().isoformat(),
         }
-    registry["current_challenger"] = None
+    bucket["current_challenger"] = None
     _save_registry(registry)
 
-    print(f"[Promotion] Champion lama diarsipkan: {backup_path}")
-    print(f"[Promotion] Challenger dipromote ke champion: {champion_path}")
+    print(f"[Promotion:{model_type}] Champion lama diarsipkan: {backup_path}")
+    print(f"[Promotion:{model_type}] Challenger dipromote ke champion: {champion_path}")
     return backup_path

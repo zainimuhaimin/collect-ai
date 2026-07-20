@@ -64,6 +64,8 @@ def compute_contract_features(
     df_payment: pd.DataFrame,
     df_lkp: pd.DataFrame,
     reference_date=None,
+    df_customer: pd.DataFrame | None = None,
+    feature_cutoff_date=None,
 ) -> pd.DataFrame:
     """Hitung 13 fitur per CONTRACT_NO.
 
@@ -72,6 +74,14 @@ def compute_contract_features(
     total_ptp_made, total_ptp_kept, ptp_fulfillment_rate,
     avg_interaction_score, last_result_code_encoded,
     treatment_count, rejection_count, payment_count.
+
+    ``feature_cutoff_date`` (opsional): jika diisi, payment_history dan
+    lkp_interaction difilter ke tanggal <= cutoff SEBELUM diagregasi. Ini
+    dipakai saat training untuk mencegah label leakage — fitur seperti
+    ``days_since_last_pay``/``avg_delay_days`` tidak boleh dihitung dari
+    payment yang jatuh di dalam window yang sama dengan target label
+    (lihat pipelines/train_*.py: cutoff = scoring_date - LABEL_WINDOW_DAYS).
+    Default None = tidak difilter (perilaku scoring harian tidak berubah).
     """
     if reference_date is None:
         reference_date = pd.Timestamp.today().normalize()
@@ -82,11 +92,27 @@ def compute_contract_features(
     p = _lower_cols(df_payment) if df_payment is not None else pd.DataFrame()
     l = _lower_cols(df_lkp) if df_lkp is not None else pd.DataFrame()
 
+    if feature_cutoff_date is not None:
+        cutoff = pd.Timestamp(feature_cutoff_date).normalize()
+        if not p.empty and "actual_pay_date" in p.columns:
+            p = p[_to_dt(p["actual_pay_date"]) <= cutoff].copy()
+        if not l.empty and "action_date" in l.columns:
+            l = l[_to_dt(l["action_date"]) <= cutoff].copy()
+
     # Base: kontrak
     cycle_src = _pick_col(c, "cycle", "cycle_akhir")
     dpd_src = _pick_col(c, "dpd_current")
     prnc_src = _pick_col(c, "prnc_ots")
     intr_src = _pick_col(c, "intr_ots")
+    # Fetch optional columns with fallback
+    ambc_src = _pick_col(c, "ambc")
+    prev_cycle_src = _pick_col(c, "prev_cycle")
+    loan_src = _pick_col(c, "loan_amount")
+    install_src = _pick_col(c, "installment_amount")
+    mat_src = _to_dt(_pick_col(c, "maturity_date"))
+    overdue_src = _pick_col(c, "overdue_installment_count", default=0)
+    late_fee_src = _pick_col(c, "late_fee_amount", default=0)
+
     out = pd.DataFrame({
         "contract_no": c["contract_no"],
         "cust_id": c["cust_id"],
@@ -94,6 +120,30 @@ def compute_contract_features(
         "cycle_encoded": cycle_src.map(CYCLE_MAP).fillna(0).astype(int),
         "total_ots": (prnc_src.fillna(0) + intr_src.fillna(0)).astype(float),
     })
+
+    out["ambc"] = ambc_src.fillna(out["total_ots"]).astype(float)
+    out["ambc_to_ots_ratio"] = _safe_div(out["ambc"], out["total_ots"]).clip(0, 1)
+
+    out["prev_cycle_encoded"] = prev_cycle_src.map(CYCLE_MAP).fillna(out["cycle_encoded"]).astype(int)
+    out["cycle_direction"] = out["cycle_encoded"] - out["prev_cycle_encoded"]
+
+    mat_days = (mat_src - pd.to_datetime(reference_date)).dt.days
+    out["days_to_maturity"] = mat_days.fillna(365).clip(lower=0).astype(int)
+
+    out["recovery_ratio"] = _safe_div(loan_src.astype(float) - out["total_ots"], loan_src.astype(float)).clip(0, 1)
+
+    # For income mapping we need cust_income_level
+    if df_customer is not None and not df_customer.empty and "cust_income_level" in df_customer.columns:
+        cust = _lower_cols(df_customer)
+        income_proxy_map = cust.set_index("cust_id")["cust_income_level"].map(INCOME_PROXY).to_dict()
+        cust_income = out["cust_id"].map(income_proxy_map).fillna(5000000)
+    else:
+        cust_income = 5000000
+    
+    out["installment_to_income_ratio"] = _safe_div(install_src.astype(float), cust_income).clip(0, 5)
+
+    out["overdue_installment_count"] = overdue_src.fillna(0).astype(int)
+    out["late_fee_amount"] = late_fee_src.fillna(0).astype(float)
 
     # ── Payment aggregates ────────────────────────────────────────
     if not p.empty and "contract_no" in p.columns:
@@ -115,16 +165,39 @@ def compute_contract_features(
         pay_agg["days_since_last_pay"] = (
             (reference_date - pay_agg["last_pay_date"]).dt.days
         )
+        
+        # New features for TASK-35
+        if 'self_cure_flag' in p.columns:
+            sc_rate = p.groupby('contract_no')['self_cure_flag'].mean().fillna(0).reset_index(name='self_cure_rate')
+            pay_agg = pay_agg.merge(sc_rate, on='contract_no', how='left')
+        else:
+            pay_agg['self_cure_rate'] = np.nan
+            
+        RECOVERY_SOURCE_MAP = {'wa': 1, 'sms': 2, 'deskcoll': 3, 'visit': 4, 'somasi': 5}
+        if 'recovery_source' in p.columns:
+            most_effective = (
+                p[p['recovery_source'].notna()]
+                .groupby('contract_no')['recovery_source']
+                .agg(lambda x: x.mode()[0] if len(x) > 0 else None)
+                .reset_index(name='recovery_source')
+            )
+            most_effective['recovery_source_encoded'] = most_effective['recovery_source'].str.lower().map(RECOVERY_SOURCE_MAP).fillna(0).astype(int)
+            pay_agg = pay_agg.merge(most_effective[['contract_no', 'recovery_source_encoded']], on='contract_no', how='left')
+            pay_agg['recovery_source_encoded'] = pay_agg['recovery_source_encoded'].fillna(0).astype(int)
+        else:
+            pay_agg['recovery_source_encoded'] = 0
+
         pay_agg = pay_agg[[
             "contract_no", "payment_count", "payment_rate", "partial_rate",
-            "avg_delay_days", "days_since_last_pay",
+            "avg_delay_days", "days_since_last_pay", "self_cure_rate", "recovery_source_encoded"
         ]]
         out = out.merge(pay_agg, on="contract_no", how="left")
     else:
         for col in ["payment_count", "payment_rate", "partial_rate",
-                    "avg_delay_days", "days_since_last_pay"]:
+                    "avg_delay_days", "days_since_last_pay", "self_cure_rate", "recovery_source_encoded"]:
             out[col] = np.nan
         out["payment_count"] = out["payment_count"].fillna(0).astype(int)
+        out["recovery_source_encoded"] = out["recovery_source_encoded"].fillna(0).astype(int)
 
     out["payment_count"] = out["payment_count"].fillna(0).astype(int)
     out["payment_rate"] = out["payment_rate"].fillna(0.0)
@@ -138,6 +211,16 @@ def compute_contract_features(
 
         lkp_id_col = "lkp_id" if "lkp_id" in l.columns else "contract_no"
 
+        # Add missing optional columns with defaults before groupby to avoid KeyError
+        if "rpc_flag" not in l.columns:
+            l["rpc_flag"] = 0
+        if "contact_success_flag" not in l.columns:
+            l["contact_success_flag"] = 0
+        if "ptp_amount" not in l.columns:
+            l["ptp_amount"] = 0.0
+        if "ptp_status" not in l.columns:
+            l["ptp_status"] = "UNKNOWN"
+
         lkp_agg = (
             l.groupby("contract_no").agg(
                 treatment_count=(lkp_id_col, "count"),
@@ -146,6 +229,10 @@ def compute_contract_features(
                     ["Menolak", "Tidak Bisa Dihubungi", "Tidak Bisa"]
                 ).sum()),
                 total_ptp_made=("result_code", lambda s: (s == "PTP").sum()),
+                rpc_count=("rpc_flag", lambda s: pd.to_numeric(s, errors="coerce").fillna(0).sum()),
+                contact_success_count=("contact_success_flag", lambda s: pd.to_numeric(s, errors="coerce").fillna(0).sum()),
+                ptp_amount_total=("ptp_amount", lambda s: pd.to_numeric(s, errors="coerce").fillna(0.0).sum()),
+                open_ptp_count=("ptp_status", lambda s: (s == "OPEN").sum()),
             ).reset_index()
         )
 
@@ -191,8 +278,15 @@ def compute_contract_features(
             lkp_agg["total_ptp_kept"] / lkp_agg["total_ptp_made"].replace(0, np.nan),
             np.nan,
         )
+        
+        # New LKP features for TASK-34
+        lkp_agg["rpc_rate"] = _safe_div(lkp_agg["rpc_count"], lkp_agg["treatment_count"]).fillna(0.0)
+        lkp_agg["contact_success_rate"] = _safe_div(lkp_agg["contact_success_count"], lkp_agg["treatment_count"]).fillna(0.0)
+        lkp_agg["open_ptp_count"] = lkp_agg["open_ptp_count"].fillna(0).astype(int)
+        # ptp_coverage_ratio uses total_ots which is in out, we'll calculate after merge
 
         out = out.merge(lkp_agg, on="contract_no", how="left")
+        out["ptp_coverage_ratio"] = _safe_div(out["ptp_amount_total"], out["total_ots"]).clip(0, 1).fillna(0.0)
     else:
         out["treatment_count"] = 0
         out["avg_interaction_score"] = np.nan
@@ -201,12 +295,24 @@ def compute_contract_features(
         out["total_ptp_kept"] = 0
         out["ptp_fulfillment_rate"] = np.nan
         out["last_result_code"] = np.nan
+        
+        # New defaults
+        out["rpc_rate"] = 0.0
+        out["contact_success_rate"] = 0.0
+        out["open_ptp_count"] = 0
+        out["ptp_coverage_ratio"] = 0.0
 
     # Fill defaults
     out["treatment_count"] = out["treatment_count"].fillna(0).astype(int)
     out["rejection_count"] = out["rejection_count"].fillna(0).astype(int)
     out["total_ptp_made"] = out["total_ptp_made"].fillna(0).astype(int)
     out["total_ptp_kept"] = out["total_ptp_kept"].fillna(0).astype(int)
+    
+    # Fill defaults for new features
+    out["rpc_rate"] = out.get("rpc_rate", 0.0).fillna(0.0)
+    out["contact_success_rate"] = out.get("contact_success_rate", 0.0).fillna(0.0)
+    out["open_ptp_count"] = out.get("open_ptp_count", 0).fillna(0).astype(int)
+    out["ptp_coverage_ratio"] = out.get("ptp_coverage_ratio", 0.0).fillna(0.0)
 
     # Encode last result code (NULL → -1 sentinel, fitur model akan handle)
     out["last_result_code_encoded"] = (
@@ -251,18 +357,29 @@ def compute_customer_features(
     df_lkp: pd.DataFrame,
     df_customer: pd.DataFrame,
     df_contract_features: pd.DataFrame | None = None,
+    feature_cutoff_date=None,
 ) -> pd.DataFrame:
     """Agregat per CUST_ID lintas semua kontrak.
 
     Jika df_contract_features sudah dihitung, di-reuse untuk efisiensi.
+    ``feature_cutoff_date``: sama seperti di compute_contract_features —
+    filter payment/lkp ke tanggal <= cutoff sebelum menghitung delay_trend
+    dan channel_effectiveness, untuk konsistensi anti-leakage saat training.
     """
     c = _lower_cols(df_contract)
     p = _lower_cols(df_payment) if df_payment is not None else pd.DataFrame()
     l = _lower_cols(df_lkp) if df_lkp is not None else pd.DataFrame()
     cust = _lower_cols(df_customer)
 
+    if feature_cutoff_date is not None:
+        cutoff = pd.Timestamp(feature_cutoff_date).normalize()
+        if not p.empty and "actual_pay_date" in p.columns:
+            p = p[_to_dt(p["actual_pay_date"]) <= cutoff].copy()
+        if not l.empty and "action_date" in l.columns:
+            l = l[_to_dt(l["action_date"]) <= cutoff].copy()
+
     if df_contract_features is None:
-        cf = compute_contract_features(c, p, l)
+        cf = compute_contract_features(c, p, l, feature_cutoff_date=feature_cutoff_date)
     else:
         cf = df_contract_features.copy()
 
@@ -282,6 +399,8 @@ def compute_customer_features(
         avg_delay_days_cust=("avg_delay_days", "mean"),
         avg_interaction_score_cust=("avg_interaction_score", "mean"),
         max_cycle_encoded=("cycle_encoded", "max"),
+        self_cure_rate=("self_cure_rate", "mean"),
+        rpc_rate=("rpc_rate", "mean"),
     ).reset_index()
 
     agg["ptp_reliability_index"] = np.where(
