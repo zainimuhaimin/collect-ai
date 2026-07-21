@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>CollectAI - Enterprise Recovery Login</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-container-high": "#e7e8e9",
+                    "on-primary": "#ffffff",
+                    "background": "#f8f9fa",
+                    "inverse-primary": "#b0c8eb",
+                    "surface-container-low": "#f3f4f5",
+                    "error": "#ba1a1a",
+                    "outline": "#74777e",
+                    "secondary-container": "#c6e4f4",
+                    "surface-dim": "#d9dadb",
+                    "surface-bright": "#f8f9fa",
+                    "surface-container-highest": "#e1e3e4",
+                    "on-tertiary-fixed-variant": "#00468b",
+                    "on-tertiary-container": "#4b8ce7",
+                    "on-tertiary-fixed": "#001b3d",
+                    "primary-fixed": "#d2e4ff",
+                    "on-secondary-container": "#4a6774",
+                    "surface": "#f8f9fa",
+                    "secondary-fixed": "#c9e7f7",
+                    "primary": "#000f22",
+                    "primary-container": "#0a2540",
+                    "on-error-container": "#93000a",
+                    "outline-variant": "#c4c6ce",
+                    "secondary": "#466270",
+                    "tertiary-container": "#00244c",
+                    "on-primary-fixed-variant": "#314865",
+                    "primary-fixed-dim": "#b0c8eb",
+                    "surface-tint": "#49607e",
+                    "on-tertiary": "#ffffff",
+                    "on-primary-fixed": "#001c37",
+                    "surface-container": "#edeeef",
+                    "on-primary-container": "#768dad",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-variant": "#e1e3e4",
+                    "secondary-fixed-dim": "#adcbda",
+                    "on-surface-variant": "#43474d",
+                    "on-background": "#191c1d",
+                    "inverse-on-surface": "#f0f1f2",
+                    "on-secondary": "#ffffff",
+                    "tertiary": "#000f26",
+                    "inverse-surface": "#2e3132",
+                    "on-error": "#ffffff",
+                    "tertiary-fixed": "#d6e3ff",
+                    "on-surface": "#191c1d",
+                    "on-secondary-fixed-variant": "#2e4b57",
+                    "tertiary-fixed-dim": "#a8c8ff",
+                    "error-container": "#ffdad6",
+                    "on-secondary-fixed": "#001f2a"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "margin-desktop": "32px",
+                    "unit": "4px",
+                    "gutter-desktop": "24px",
+                    "container-max-width": "1440px",
+                    "gutter-mobile": "16px",
+                    "margin-mobile": "16px"
+            },
+            "fontFamily": {
+                    "display-lg": ["Inter"],
+                    "label-sm": ["Inter"],
+                    "headline-sm": ["Inter"],
+                    "headline-lg": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "body-md": ["Inter"],
+                    "label-lg": ["Inter"],
+                    "title-lg": ["Inter"],
+                    "label-md": ["Inter"],
+                    "headline-lg-mobile": ["Inter"],
+                    "title-md": ["Inter"]
+            },
+            "fontSize": {
+                    "display-lg": ["57px", {"lineHeight": "64px", "letterSpacing": "-0.25px", "fontWeight": "400"}],
+                    "label-sm": ["11px", {"lineHeight": "16px", "letterSpacing": "0.5px", "fontWeight": "500"}],
+                    "headline-sm": ["24px", {"lineHeight": "32px", "fontWeight": "500"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "600"}],
+                    "body-lg": ["16px", {"lineHeight": "24px", "letterSpacing": "0.5px", "fontWeight": "400"}],
+                    "body-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.25px", "fontWeight": "400"}],
+                    "label-lg": ["14px", {"lineHeight": "20px", "letterSpacing": "0.1px", "fontWeight": "500"}],
+                    "title-lg": ["22px", {"lineHeight": "28px", "fontWeight": "500"}],
+                    "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.5px", "fontWeight": "500"}],
+                    "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "600"}],
+                    "title-md": ["16px", {"lineHeight": "24px", "letterSpacing": "0.15px", "fontWeight": "600"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f9fa;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .login-card {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.8s ease-out forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .loader {
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #ffffff;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 0.8s linear infinite;
+            display: none;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex">
+<!-- Global Navigation Suppressed for Login Screen per Identity Rules -->
+<main class="flex flex-col md:flex-row w-full min-h-screen">
+<!-- Left Panel: Brand & Identity -->
+<section class="hidden md:flex md:w-1/2 lg:w-3/5 bg-primary-container relative overflow-hidden items-center justify-center p-margin-desktop">
+<!-- Atmospheric Background Texture -->
+<div class="absolute inset-0 opacity-20 pointer-events-none" style="background-image: radial-gradient(circle at 2px 2px, #768dad 1px, transparent 0); background-size: 40px 40px;"></div>
+<div class="absolute top-0 right-0 w-96 h-96 bg-primary rounded-full filter blur-[120px] opacity-30 -mr-48 -mt-48"></div>
+<div class="absolute bottom-0 left-0 w-64 h-64 bg-tertiary-container rounded-full filter blur-[100px] opacity-20 -ml-32 -mb-32"></div>
+<div class="relative z-10 max-w-xl animate-fade-in">
+<div class="flex items-center gap-4 mb-8">
+<div class="w-16 h-16 bg-on-primary rounded-xl flex items-center justify-center shadow-lg">
+<span class="material-symbols-outlined text-primary-container text-4xl" style="font-variation-settings: 'FILL' 1;">account_balance</span>
+</div>
+<div>
+<h1 class="font-display-lg text-title-lg font-bold text-on-primary leading-none tracking-tight">CollectAI</h1>
+<p class="font-label-lg text-on-primary-container mt-1">Enterprise Recovery</p>
+</div>
+</div>
+<h2 class="font-headline-lg text-headline-lg text-white mb-6 leading-tight">
+                    Intelligent Debt Recovery, <br/>Built for Institutional Trust.
+                </h2>
+<p class="font-body-lg text-body-lg text-on-primary-container mb-12 max-w-lg">
+                    Manage high-stakes financial portfolios with a disciplined, data-driven approach. Our AI-powered platform transforms debt collection into a collaborative settlement process.
+                </p>
+<div class="grid grid-cols-2 gap-8 border-t border-on-primary-container/20 pt-8">
+<div>
+<p class="font-headline-sm text-headline-sm text-white">98.4%</p>
+<p class="font-label-md text-label-md text-on-primary-container uppercase tracking-wider mt-1">Recovery Rate</p>
+</div>
+<div>
+<p class="font-headline-sm text-headline-sm text-white">2.4M</p>
+<p class="font-label-md text-label-md text-on-primary-container uppercase tracking-wider mt-1">Managed Accounts</p>
+</div>
+</div>
+</div>
+<!-- Abstract Data Visualization Image -->
+<div class="absolute bottom-12 right-12 w-1/2 opacity-40">
+<div class="relative w-full aspect-video rounded-2xl overflow-hidden border border-on-primary-container/10 bg-surface-container-lowest/5 backdrop-blur-sm p-4">
+<div class="w-full h-full bg-cover bg-center rounded-lg grayscale opacity-60" data-alt="A sophisticated data visualization interface showing complex financial recovery trends. The style is modern corporate with deep navy backgrounds and glowing teal and white data points. Clean minimalist lines and semi-transparent glass panels create a sense of advanced analytical technology and institutional security." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDdht6np--oQiTGF2ktQfk1UiHCLUdwu4-VnIO0SRi8ILOBgaaOJAjn1WwqYL78FUpXQHdeomptknnDYL9Yl38-cgc6XdT1uFdn-bCVAaNUIKOdys9guStJ9e2wiPU6REffWTgrXQmzom2JB2A7DXVie2Xo7mVIrZZiW9nUOHdAMjljQcNgCIr6uaXu8bWyVoJcWUzlCsa9IZhhUGKW1yvx14kDhoqnYtTA9IwZz_dGB-qXnWEjyysMiGMWCeq26zHLP9OqzKRkU4M')"></div>
+</div>
+</div>
+</section>
+<!-- Right Panel: Login Card -->
+<section class="flex-1 bg-surface flex items-center justify-center p-gutter-mobile md:p-margin-desktop">
+<div class="w-full max-w-md animate-fade-in" style="animation-delay: 0.2s;">
+<!-- Mobile Logo (Visible only on small screens) -->
+<div class="md:hidden flex items-center gap-3 mb-12">
+<div class="w-10 h-10 bg-primary-container rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-2xl" style="font-variation-settings: 'FILL' 1;">account_balance</span>
+</div>
+<span class="font-display-lg text-title-lg font-bold text-primary">CollectAI</span>
+</div>
+<div class="mb-10">
+<h3 class="font-headline-lg text-headline-lg text-on-surface mb-2">Secure Access</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Enter your enterprise credentials to access the recovery dashboard.</p>
+</div>
+<form class="space-y-6" id="loginForm">
+<div class="space-y-2">
+<label class="font-label-lg text-label-lg text-on-surface-variant ml-1" for="username">Username or Employee ID</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline">person</span>
+<input class="w-full pl-12 pr-4 py-3.5 bg-surface-container-lowest border border-outline-variant rounded-lg font-body-md text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all" id="username" placeholder="e.g. j.doe@collectai.com" required="" type="text"/>
+</div>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between items-center px-1">
+<label class="font-label-lg text-label-lg text-on-surface-variant" for="password">Password</label>
+<a class="font-label-md text-label-md text-primary-container hover:underline" href="#">Forgot?</a>
+</div>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline">lock</span>
+<input class="w-full pl-12 pr-12 py-3.5 bg-surface-container-lowest border border-outline-variant rounded-lg font-body-md text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all" id="password" placeholder="••••••••••••" required="" type="password"/>
+<button class="absolute right-4 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface transition-colors" type="button">
+<span class="material-symbols-outlined">visibility</span>
+</button>
+</div>
+</div>
+<div class="flex items-center gap-3 px-1">
+<input class="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary" id="remember" type="checkbox"/>
+<label class="font-label-md text-label-md text-on-surface-variant" for="remember">Remember this workstation</label>
+</div>
+<button class="w-full bg-primary-container text-on-primary font-label-lg text-label-lg py-4 rounded-lg flex items-center justify-center gap-2 hover:bg-primary active:scale-[0.98] transition-all shadow-md mt-8" id="signInBtn" type="submit">
+<span>Sign In</span>
+<div class="loader" id="btnLoader"></div>
+<span class="material-symbols-outlined" id="btnIcon">arrow_forward</span>
+</button>
+</form>
+<div class="mt-12 pt-8 border-t border-outline-variant/30 text-center">
+<p class="font-label-md text-label-md text-on-surface-variant mb-4">Authorized Personnel Only</p>
+<div class="flex items-center justify-center gap-6">
+<div class="flex items-center gap-1.5 grayscale opacity-50">
+<span class="material-symbols-outlined text-sm">verified_user</span>
+<span class="text-[10px] font-bold uppercase tracking-widest">ISO 27001</span>
+</div>
+<div class="flex items-center gap-1.5 grayscale opacity-50">
+<span class="material-symbols-outlined text-sm">security</span>
+<span class="text-[10px] font-bold uppercase tracking-widest">SOC2 TYPE II</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<script>
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const btn = document.getElementById('signInBtn');
+            const loader = document.getElementById('btnLoader');
+            const icon = document.getElementById('btnIcon');
+            const text = btn.querySelector('span');
+
+            // Visual feedback
+            btn.classList.add('opacity-90', 'cursor-not-allowed');
+            text.textContent = 'Authenticating...';
+            loader.style.display = 'block';
+            icon.style.display = 'none';
+
+            // Simulate navigation to Dashboard
+            setTimeout(() => {
+                // In a real app, this would be window.location.href = '/dashboard'
+                alert('Success! Redirecting to Dashboard...');
+                window.location.reload(); // Simulate reset/navigation for demo
+            }, 1800);
+        });
+
+        // Toggle password visibility
+        const toggleBtn = document.querySelector('button[type="button"]');
+        const passwordInput = document.getElementById('password');
+        
+        toggleBtn.addEventListener('click', () => {
+            const isPassword = passwordInput.type === 'password';
+            passwordInput.type = isPassword ? 'text' : 'password';
+            toggleBtn.querySelector('span').textContent = isPassword ? 'visibility_off' : 'visibility';
+        });
+    </script>
+</body></html>
