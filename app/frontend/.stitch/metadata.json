@@ -1,0 +1,104 @@
+{
+  "projectId": "7849988364515669089",
+  "title": "Remix of CollectAI Enterprise Dashboard",
+  "deviceType": "DESKTOP",
+  "origin": "STITCH",
+  "projectType": "TEXT_TO_UI_PRO",
+  "lastSyncTime": "2026-07-21T14:15:00Z",
+  "outputApp": "app/frontend",
+  "screens": {
+    "208cc2258bf049ce81fc6cf840f77ea3": {
+      "label": "Customer Detail - CollectAI",
+      "sourceScreen": "projects/7849988364515669089/screens/208cc2258bf049ce81fc6cf840f77ea3",
+      "width": 2560,
+      "height": 2048,
+      "canvasPosition": {
+        "x": 6400
+      },
+      "localFile": ".stitch/designs/customer-detail.html",
+      "component": "src/pages/CustomerDetailPage.tsx",
+      "route": "/customers/:id"
+    },
+    "32988c6aa52e4b51b4d215e12aeee1c3": {
+      "label": "Performance - CollectAI",
+      "sourceScreen": "projects/7849988364515669089/screens/32988c6aa52e4b51b4d215e12aeee1c3",
+      "width": 2560,
+      "height": 2048,
+      "canvasPosition": {
+        "x": 3712
+      },
+      "localFile": ".stitch/designs/performance.html",
+      "component": "src/pages/PerformancePage.tsx",
+      "route": "/performance"
+    },
+    "356d0d39bbfd42529335d2e657bbc0aa": {
+      "label": "AI Intelligence - CollectAI",
+      "sourceScreen": "projects/7849988364515669089/screens/356d0d39bbfd42529335d2e657bbc0aa",
+      "width": 2560,
+      "height": 2048,
+      "canvasPosition": {
+        "x": 7744
+      },
+      "localFile": ".stitch/designs/ai-intelligence.html",
+      "component": "src/pages/AiIntelligencePage.tsx",
+      "route": "/ai-intelligence"
+    },
+    "8b2abda24f2e48cc83fe97c4dc29675a": {
+      "label": "CollectAI Enterprise Recovery System",
+      "sourceScreen": "projects/7849988364515669089/screens/8b2abda24f2e48cc83fe97c4dc29675a",
+      "width": 1280,
+      "height": 1024,
+      "canvasPosition": {
+        "x": 9088
+      },
+      "localFile": ".stitch/designs/recovery-system.html",
+      "component": "src/pages/RecoveryAccessPage.tsx",
+      "route": "/access",
+      "note": "No screenshot was available for this screen; converted directly from HTML source."
+    },
+    "assets_32bd814f03f6480e92542fef4904e341": {
+      "label": "Design System Instance",
+      "type": "DESIGN_SYSTEM_INSTANCE",
+      "sourceAsset": "assets/32bd814f03f6480e92542fef4904e341",
+      "width": 960,
+      "height": 540,
+      "note": "Design system reference instance, not a page. Tokens extracted into resources/style-guide.json and tailwind.config.js."
+    },
+    "ddf0ba45301643d88766fdb21846b84f": {
+      "label": "Collector Workbench - CollectAI",
+      "sourceScreen": "projects/7849988364515669089/screens/ddf0ba45301643d88766fdb21846b84f",
+      "width": 2560,
+      "height": 2048,
+      "canvasPosition": {
+        "x": 5056
+      },
+      "localFile": ".stitch/designs/workbench.html",
+      "component": "src/pages/CollectorWorkbenchPage.tsx",
+      "route": "/workbench"
+    },
+    "e7786ff797f145a2a362a5d68e9f8f47": {
+      "label": "Dashboard - CollectAI",
+      "sourceScreen": "projects/7849988364515669089/screens/e7786ff797f145a2a362a5d68e9f8f47",
+      "width": 2560,
+      "height": 2048,
+      "canvasPosition": {
+        "x": 2368
+      },
+      "localFile": ".stitch/designs/dashboard.html",
+      "component": "src/pages/DashboardPage.tsx",
+      "route": "/dashboard"
+    },
+    "ff5c047e71f04e23979f09826ff1f481": {
+      "label": "Login - CollectAI",
+      "sourceScreen": "projects/7849988364515669089/screens/ff5c047e71f04e23979f09826ff1f481",
+      "width": 2560,
+      "height": 2048,
+      "canvasPosition": {
+        "x": 1024
+      },
+      "localFile": ".stitch/designs/login.html",
+      "component": "src/pages/LoginPage.tsx",
+      "route": "/login"
+    }
+  }
+}

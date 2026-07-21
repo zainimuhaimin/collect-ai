@@ -1,0 +1,542 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>CollectAI Enterprise Recovery Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<!-- Theme Configuration -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-container-high": "#e7e8e9",
+                    "on-primary": "#ffffff",
+                    "background": "#f8f9fa",
+                    "inverse-primary": "#b0c8eb",
+                    "surface-container-low": "#f3f4f5",
+                    "error": "#ba1a1a",
+                    "outline": "#74777e",
+                    "secondary-container": "#c6e4f4",
+                    "surface-dim": "#d9dadb",
+                    "surface-bright": "#f8f9fa",
+                    "surface-container-highest": "#e1e3e4",
+                    "on-tertiary-fixed-variant": "#00468b",
+                    "on-tertiary-container": "#4b8ce7",
+                    "on-tertiary-fixed": "#001b3d",
+                    "primary-fixed": "#d2e4ff",
+                    "on-secondary-container": "#4a6774",
+                    "surface": "#f8f9fa",
+                    "secondary-fixed": "#c9e7f7",
+                    "primary": "#000f22",
+                    "primary-container": "#0a2540",
+                    "on-error-container": "#93000a",
+                    "outline-variant": "#c4c6ce",
+                    "secondary": "#466270",
+                    "tertiary-container": "#00244c",
+                    "on-primary-fixed-variant": "#314865",
+                    "primary-fixed-dim": "#b0c8eb",
+                    "surface-tint": "#49607e",
+                    "on-tertiary": "#ffffff",
+                    "on-primary-fixed": "#001c37",
+                    "surface-container": "#edeeef",
+                    "on-primary-container": "#768dad",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-variant": "#e1e3e4",
+                    "secondary-fixed-dim": "#adcbda",
+                    "on-surface-variant": "#43474d",
+                    "on-background": "#191c1d",
+                    "inverse-on-surface": "#f0f1f2",
+                    "on-secondary": "#ffffff",
+                    "tertiary": "#000f26",
+                    "inverse-surface": "#2e3132",
+                    "on-error": "#ffffff",
+                    "tertiary-fixed": "#d6e3ff",
+                    "on-surface": "#191c1d",
+                    "on-secondary-fixed-variant": "#2e4b57",
+                    "tertiary-fixed-dim": "#a8c8ff",
+                    "error-container": "#ffdad6",
+                    "on-secondary-fixed": "#001f2a"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "margin-desktop": "32px",
+                    "unit": "4px",
+                    "gutter-desktop": "24px",
+                    "container-max-width": "1440px",
+                    "gutter-mobile": "16px",
+                    "margin-mobile": "16px"
+            },
+            "fontFamily": {
+                    "display-lg": ["Inter"],
+                    "label-sm": ["Inter"],
+                    "headline-sm": ["Inter"],
+                    "headline-lg": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "body-md": ["Inter"],
+                    "label-lg": ["Inter"],
+                    "title-lg": ["Inter"],
+                    "label-md": ["Inter"],
+                    "headline-lg-mobile": ["Inter"],
+                    "title-md": ["Inter"]
+            },
+            "fontSize": {
+                    "display-lg": ["57px", {"lineHeight": "64px", "letterSpacing": "-0.25px", "fontWeight": "400"}],
+                    "label-sm": ["11px", {"lineHeight": "16px", "letterSpacing": "0.5px", "fontWeight": "500"}],
+                    "headline-sm": ["24px", {"lineHeight": "32px", "fontWeight": "500"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "600"}],
+                    "body-lg": ["16px", {"lineHeight": "24px", "letterSpacing": "0.5px", "fontWeight": "400"}],
+                    "body-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.25px", "fontWeight": "400"}],
+                    "label-lg": ["14px", {"lineHeight": "20px", "letterSpacing": "0.1px", "fontWeight": "500"}],
+                    "title-lg": ["22px", {"lineHeight": "28px", "fontWeight": "500"}],
+                    "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.5px", "fontWeight": "500"}],
+                    "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "600"}],
+                    "title-md": ["16px", {"lineHeight": "24px", "letterSpacing": "0.15px", "fontWeight": "600"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .scroll-hide::-webkit-scrollbar { display: none; }
+        .scroll-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        .bento-card {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .bento-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(10, 37, 64, 0.08);
+        }
+
+        .chart-bar-stacked {
+            background: linear-gradient(to top, #0a2540 70%, #b0c8eb 70% 85%, #c4c6ce 85%);
+        }
+
+        .funnel-step {
+            clip-path: polygon(0% 0%, 95% 0%, 100% 50%, 95% 100%, 0% 100%, 5% 50%);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface flex h-screen overflow-hidden">
+<!-- SideNavBar (Shared Component) -->
+<!-- Content & Identity: Exact strings from JSON -->
+<!-- EXECUTION: Mapping style_* keys -->
+<aside class="fixed left-0 top-0 h-screen w-[280px] border-r border-outline-variant bg-surface-container-lowest flex flex-col py-8 px-4 gap-2 z-50">
+<div class="flex items-center gap-3 px-4 mb-8">
+<div class="w-10 h-10 rounded-lg bg-primary-container flex items-center justify-center text-white">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">account_balance</span>
+</div>
+<div>
+<h1 class="font-display-lg text-title-lg font-bold text-primary">CollectAI</h1>
+<p class="font-label-md text-on-surface-variant leading-none">Enterprise Recovery</p>
+</div>
+</div>
+<nav class="flex-1 space-y-1">
+<!-- Active Navigation: Dashboard -->
+<a class="flex items-center gap-3 px-4 py-3 bg-primary text-on-primary rounded-lg font-bold transition-transform duration-100 ease-in-out active:scale-95" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label-lg">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined">query_stats</span>
+<span class="font-label-lg">Performance</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined">work</span>
+<span class="font-label-lg">Collector Workbench</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined">group</span>
+<span class="font-label-lg">Customer Detail</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors duration-200 rounded-lg" href="#">
+<span class="material-symbols-outlined">psychology</span>
+<span class="font-label-lg">AI Intelligence</span>
+</a>
+</nav>
+<div class="mt-auto p-4 bg-surface-container-low rounded-xl">
+<div class="flex items-center gap-3 mb-3">
+<div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+<span class="font-label-sm text-on-surface-variant">System Status: Optimal</span>
+</div>
+<button class="w-full py-2 bg-surface-container-highest text-primary font-label-lg rounded-lg hover:bg-outline-variant transition-colors">
+                Support Hub
+            </button>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-[280px] flex-1 flex flex-col h-screen overflow-hidden">
+<!-- TopAppBar (Shared Component) -->
+<header class="fixed top-0 right-0 left-[280px] h-16 bg-surface border-b border-outline-variant flex items-center justify-between px-gutter-desktop z-40">
+<div class="flex items-center gap-4">
+<h2 class="font-headline-sm text-headline-sm font-black text-primary">Consolidated Dashboard</h2>
+</div>
+<div class="flex items-center gap-6">
+<!-- Search Bar (on_right) -->
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
+<input class="pl-10 pr-4 py-1.5 bg-surface-container-low border-none rounded-full w-64 text-body-md focus:ring-2 focus:ring-primary transition-all" placeholder="Search debtor or ID..." type="text">
+</div>
+<div class="flex items-center gap-3 border-l border-outline-variant pl-6">
+<button class="text-on-surface-variant hover:bg-surface-container-low p-2 rounded-full transition-all relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full border-2 border-surface"></span>
+</button>
+<button class="text-on-surface-variant hover:bg-surface-container-low p-2 rounded-full transition-all">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<div class="flex items-center gap-3 ml-2 cursor-pointer group">
+<div class="text-right">
+<p class="font-label-lg text-primary leading-none">Admin User</p>
+<p class="font-label-sm text-outline">Portfolio Manager</p>
+</div>
+<img class="w-10 h-10 rounded-full border border-outline-variant group-hover:ring-2 group-hover:ring-primary transition-all" data-alt="A professional headshot of a corporate manager in a high-tech financial office setting. The lighting is crisp and cool-toned, matching a modern light-mode UI. The person is dressed in business casual attire, conveying reliability and expertise in a high-stakes financial data environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBMrwGQMcYjGN8MxLOumH7yqgXsP8Pr2EAwNvTuvsnZDCfbMvo1UUo_7BXzAcweLzTsL-lpuFRdi4EO6373Nof9aqdenTgC_r46g3C9cehq_F3cDlFDRPFuB2h04aTWM3WtUcgrbnw3FjcyZVWFNOCejR7DN0-pb_fpuWChG56Kqyek8Ha493t-e0QsRNqHMMhA-ZgR5DsFEXUzlCRlDmub5Xk4L3vHKEdU0Dp8T2S2RPQx76w819V2XXCuQuNDD3kt6xk36hfVwJ8">
+</div>
+</div>
+</div>
+</header>
+<!-- Scrollable Dashboard Content -->
+<div class="mt-16 p-gutter-desktop overflow-y-auto h-full space-y-6 scroll-hide">
+<!-- Top Row: KPI Cards -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+<!-- KPI 1 -->
+<div class="bento-card bg-surface-container-lowest p-6 rounded-xl border border-outline-variant flex flex-col justify-between">
+<div class="flex justify-between items-start mb-4">
+<div class="p-2 bg-primary-container rounded-lg text-on-primary">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+</div>
+<span class="text-green-600 font-label-md flex items-center gap-1">+4.2% <span class="material-symbols-outlined text-[14px]">trending_up</span></span>
+</div>
+<div>
+<p class="font-label-md text-outline">Total Outstanding</p>
+<h3 class="font-headline-sm text-headline-sm font-bold text-primary">Rp 4.280.000.000</h3>
+</div>
+</div>
+<!-- KPI 2 -->
+<div class="bento-card bg-surface-container-lowest p-6 rounded-xl border border-outline-variant flex flex-col justify-between">
+<div class="flex justify-between items-start mb-4">
+<div class="p-2 bg-secondary-container rounded-lg text-on-secondary-container">
+<span class="material-symbols-outlined">person_alert</span>
+</div>
+<span class="text-red-600 font-label-md flex items-center gap-1">-1.5% <span class="material-symbols-outlined text-[14px]">trending_down</span></span>
+</div>
+<div>
+<p class="font-label-md text-outline">Active Delinquent Accounts</p>
+<h3 class="font-headline-sm text-headline-sm font-bold text-primary">12,482</h3>
+</div>
+</div>
+<!-- KPI 3 -->
+<div class="bento-card bg-surface-container-lowest p-6 rounded-xl border border-outline-variant flex flex-col justify-between">
+<div class="flex justify-between items-start mb-4">
+<div class="p-2 bg-tertiary-fixed rounded-lg text-on-tertiary-fixed">
+<span class="material-symbols-outlined">check_circle</span>
+</div>
+<span class="text-green-600 font-label-md flex items-center gap-1">+12% <span class="material-symbols-outlined text-[14px]">trending_up</span></span>
+</div>
+<div>
+<p class="font-label-md text-outline">PTP Success Rate (%)</p>
+<h3 class="font-headline-sm text-headline-sm font-bold text-primary">74.2%</h3>
+</div>
+</div>
+<!-- KPI 4 -->
+<div class="bento-card bg-surface-container-lowest p-6 rounded-xl border border-outline-variant flex flex-col justify-between">
+<div class="flex justify-between items-start mb-4">
+<div class="p-2 bg-primary text-on-primary rounded-lg">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">psychology</span>
+</div>
+<span class="text-outline font-label-md">Stable</span>
+</div>
+<div>
+<p class="font-label-md text-outline">Avg AI Confidence (%)</p>
+<h3 class="font-headline-sm text-headline-sm font-bold text-primary">89.5%</h3>
+</div>
+</div>
+</div>
+<!-- Middle Row: Charts -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+<!-- Stacked Bar Chart -->
+<div class="lg:col-span-2 bg-surface-container-lowest p-6 rounded-xl border border-outline-variant">
+<div class="flex justify-between items-center mb-8">
+<div>
+<h4 class="font-title-md text-title-md text-primary">DPD Buckets vs PTP Status</h4>
+<p class="font-label-md text-outline">Portfolio distribution by aging and commitment</p>
+</div>
+<div class="flex gap-4">
+<div class="flex items-center gap-2"><span class="w-3 h-3 bg-primary rounded-full"></span><span class="font-label-sm">Settled</span></div>
+<div class="flex items-center gap-2"><span class="w-3 h-3 bg-primary-fixed-dim rounded-full"></span><span class="font-label-sm">Active PTP</span></div>
+<div class="flex items-center gap-2"><span class="w-3 h-3 bg-outline-variant rounded-full"></span><span class="font-label-sm">Broken</span></div>
+</div>
+</div>
+<div class="h-64 flex items-end justify-around gap-4 px-4">
+<!-- Bucket C0 -->
+<div class="flex flex-col items-center w-full gap-2">
+<div class="w-full flex flex-col-reverse rounded-t-lg overflow-hidden h-[200px]">
+<div class="bg-primary flex-1" title="Settled"></div>
+<div class="bg-primary-fixed-dim h-[40px]" title="Active"></div>
+<div class="bg-outline-variant h-[20px]" title="Broken"></div>
+</div>
+<span class="font-label-md text-outline">C0 (1-30)</span>
+</div>
+<!-- Bucket C1 -->
+<div class="flex flex-col items-center w-full gap-2">
+<div class="w-full flex flex-col-reverse rounded-t-lg overflow-hidden h-[180px]">
+<div class="bg-primary h-[120px]"></div>
+<div class="bg-primary-fixed-dim h-[30px]"></div>
+<div class="bg-outline-variant h-[30px]"></div>
+</div>
+<span class="font-label-md text-outline">C1 (31-60)</span>
+</div>
+<!-- Bucket C2 -->
+<div class="flex flex-col items-center w-full gap-2">
+<div class="w-full flex flex-col-reverse rounded-t-lg overflow-hidden h-[140px]">
+<div class="bg-primary h-[80px]"></div>
+<div class="bg-primary-fixed-dim h-[20px]"></div>
+<div class="bg-outline-variant h-[40px]"></div>
+</div>
+<span class="font-label-md text-outline">C2 (61-90)</span>
+</div>
+<!-- Bucket C3+ -->
+<div class="flex flex-col items-center w-full gap-2">
+<div class="w-full flex flex-col-reverse rounded-t-lg overflow-hidden h-[100px]">
+<div class="bg-primary h-[30px]"></div>
+<div class="bg-primary-fixed-dim h-[10px]"></div>
+<div class="bg-outline-variant h-[60px]"></div>
+</div>
+<span class="font-label-md text-outline">C3+ (90+)</span>
+</div>
+</div>
+</div>
+<!-- Funnel Chart -->
+<div class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant">
+<h4 class="font-title-md text-title-md text-primary mb-2">Contactability Funnel</h4>
+<p class="font-label-md text-outline mb-8">Efficiency of omni-channel recovery</p>
+<div class="space-y-4">
+<div class="relative">
+<div class="funnel-step bg-primary-container text-white py-3 px-8 text-center relative z-10">
+<span class="font-label-lg">Attempts (100k)</span>
+</div>
+<div class="absolute right-[-10px] top-1/2 -translate-y-1/2 text-outline font-label-sm">100%</div>
+</div>
+<div class="relative px-2">
+<div class="funnel-step bg-primary text-white py-3 px-8 text-center relative z-10">
+<span class="font-label-lg">Contacted (65k)</span>
+</div>
+<div class="absolute right-[-10px] top-1/2 -translate-y-1/2 text-outline font-label-sm">65%</div>
+</div>
+<div class="relative px-6">
+<div class="funnel-step bg-on-tertiary-fixed-variant text-white py-3 px-8 text-center relative z-10">
+<span class="font-label-lg">Engaged (32k)</span>
+</div>
+<div class="absolute right-[-10px] top-1/2 -translate-y-1/2 text-outline font-label-sm">32%</div>
+</div>
+<div class="relative px-10">
+<div class="funnel-step bg-primary-fixed-dim text-primary py-3 px-8 text-center relative z-10">
+<span class="font-label-lg">Commitment (18k)</span>
+</div>
+<div class="absolute right-[-10px] top-1/2 -translate-y-1/2 text-outline font-label-sm">18%</div>
+</div>
+</div>
+<div class="mt-8 pt-6 border-t border-outline-variant">
+<div class="flex justify-between items-center">
+<span class="font-label-md text-outline">Channel Efficiency</span>
+<span class="font-label-md text-primary font-bold">WhatsApp (82%)</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Bottom Row: High AMBC Table -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant overflow-hidden">
+<div class="p-6 border-b border-outline-variant flex justify-between items-center">
+<div>
+<h4 class="font-title-md text-title-md text-primary">Broken PTP - High AMBC Priorities</h4>
+<p class="font-label-md text-outline">Accounts requiring immediate manual intervention based on Artificial Intelligence Behavioral Analysis</p>
+</div>
+<button class="px-4 py-2 bg-primary text-white font-label-lg rounded-lg hover:opacity-90 transition-all flex items-center gap-2">
+<span class="material-symbols-outlined text-[20px]">assignment_late</span>
+                        Bulk Assign
+                    </button>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left">
+<thead class="bg-surface-container-low text-outline font-label-md">
+<tr>
+<th class="px-6 py-4 font-semibold uppercase tracking-wider">Customer ID</th>
+<th class="px-6 py-4 font-semibold uppercase tracking-wider">Name</th>
+<th class="px-6 py-4 font-semibold uppercase tracking-wider">Amount (Rp)</th>
+<th class="px-6 py-4 font-semibold uppercase tracking-wider">AMBC Value</th>
+<th class="px-6 py-4 font-semibold uppercase tracking-wider">Last Action</th>
+<th class="px-6 py-4 font-semibold uppercase tracking-wider">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant">
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="px-6 py-4 font-label-lg text-primary">#CA-88901</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center text-on-secondary-container font-bold text-xs">AS</div>
+<span class="font-body-md font-medium">Andi Saputra</span>
+</div>
+</td>
+<td class="px-6 py-4 font-body-md">Rp 12.500.000</td>
+<td class="px-6 py-4">
+<span class="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold flex items-center w-fit gap-1">
+<span class="material-symbols-outlined text-[14px]">warning</span> 0.94 High
+                                    </span>
+</td>
+<td class="px-6 py-4">
+<div class="flex flex-col">
+<span class="font-label-md">Broken Promise</span>
+<span class="text-xs text-outline">Oct 24, 2023</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<button class="text-primary hover:underline font-label-lg">Review</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="px-6 py-4 font-label-lg text-primary">#CA-88942</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center text-on-secondary-container font-bold text-xs">RT</div>
+<span class="font-body-md font-medium">Rina Tiara</span>
+</div>
+</td>
+<td class="px-6 py-4 font-body-md">Rp 8.240.000</td>
+<td class="px-6 py-4">
+<span class="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold flex items-center w-fit gap-1">
+<span class="material-symbols-outlined text-[14px]">warning</span> 0.89 High
+                                    </span>
+</td>
+<td class="px-6 py-4">
+<div class="flex flex-col">
+<span class="font-label-md">Partial Payment Failed</span>
+<span class="text-xs text-outline">Oct 23, 2023</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<button class="text-primary hover:underline font-label-lg">Review</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="px-6 py-4 font-label-lg text-primary">#CA-89012</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center text-on-secondary-container font-bold text-xs">BP</div>
+<span class="font-body-md font-medium">Bambang Pamungkas</span>
+</div>
+</td>
+<td class="px-6 py-4 font-body-md">Rp 25.100.000</td>
+<td class="px-6 py-4">
+<span class="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold flex items-center w-fit gap-1">
+<span class="material-symbols-outlined text-[14px]">warning</span> 0.92 High
+                                    </span>
+</td>
+<td class="px-6 py-4">
+<div class="flex flex-col">
+<span class="font-label-md">WA Unread &gt; 48h</span>
+<span class="text-xs text-outline">Oct 22, 2023</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<button class="text-primary hover:underline font-label-lg">Review</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="px-6 py-4 font-label-lg text-primary">#CA-89211</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center text-on-secondary-container font-bold text-xs">SM</div>
+<span class="font-body-md font-medium">Siti Maesaroh</span>
+</div>
+</td>
+<td class="px-6 py-4 font-body-md">Rp 4.700.000</td>
+<td class="px-6 py-4">
+<span class="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold flex items-center w-fit gap-1">
+<span class="material-symbols-outlined text-[14px]">warning</span> 0.81 High
+                                    </span>
+</td>
+<td class="px-6 py-4">
+<div class="flex flex-col">
+<span class="font-label-md">Direct Refusal</span>
+<span class="text-xs text-outline">Oct 22, 2023</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<button class="text-primary hover:underline font-label-lg">Review</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="px-6 py-4 font-label-lg text-primary">#CA-89304</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center text-on-secondary-container font-bold text-xs">DF</div>
+<span class="font-body-md font-medium">Dedi Firmansyah</span>
+</div>
+</td>
+<td class="px-6 py-4 font-body-md">Rp 18.900.000</td>
+<td class="px-6 py-4">
+<span class="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold flex items-center w-fit gap-1">
+<span class="material-symbols-outlined text-[14px]">warning</span> 0.97 High
+                                    </span>
+</td>
+<td class="px-6 py-4">
+<div class="flex flex-col">
+<span class="font-label-md">Skiptrace Required</span>
+<span class="text-xs text-outline">Oct 21, 2023</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<button class="text-primary hover:underline font-label-lg">Review</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Footer Meta -->
+<div class="flex justify-between items-center pt-4 pb-12">
+<p class="font-label-sm text-outline">Data last synchronized: 2 minutes ago</p>
+<div class="flex gap-4">
+<button class="font-label-md text-primary flex items-center gap-2 px-3 py-1 hover:bg-surface-container-low rounded-lg transition-all">
+<span class="material-symbols-outlined text-[18px]">download</span> Export Report
+                    </button>
+<button class="font-label-md text-primary flex items-center gap-2 px-3 py-1 hover:bg-surface-container-low rounded-lg transition-all">
+<span class="material-symbols-outlined text-[18px]">share</span> Share Insight
+                    </button>
+</div>
+</div>
+</div>
+</main>
+<!-- Contextual FAB (Suppressed on Dashboard as per Rules, but included for logic if needed elsewhere) -->
+<!-- Removed FAB as per Mandate: Contextual FAB Suppression on Dashboard screens if not primary action -->
+<script>
+        // Simple Interaction logic for demo
+        document.querySelectorAll('.bento-card').forEach(card => {
+            card.addEventListener('click', () => {
+                console.log('KPI Clicked - Drilldown opening...');
+            });
+        });
+
+        // Search highlight logic
+        const searchInput = document.querySelector('input[type="text"]');
+        searchInput.addEventListener('focus', () => {
+            searchInput.parentElement.classList.add('scale-105');
+        });
+        searchInput.addEventListener('blur', () => {
+            searchInput.parentElement.classList.remove('scale-105');
+        });
+    </script>
+</body></html>

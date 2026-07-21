@@ -1,0 +1,552 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>CollectAI | Performance Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-container-high": "#e7e8e9",
+                    "on-primary": "#ffffff",
+                    "background": "#f8f9fa",
+                    "inverse-primary": "#b0c8eb",
+                    "surface-container-low": "#f3f4f5",
+                    "error": "#ba1a1a",
+                    "outline": "#74777e",
+                    "secondary-container": "#c6e4f4",
+                    "surface-dim": "#d9dadb",
+                    "surface-bright": "#f8f9fa",
+                    "surface-container-highest": "#e1e3e4",
+                    "on-tertiary-fixed-variant": "#00468b",
+                    "on-tertiary-container": "#4b8ce7",
+                    "on-tertiary-fixed": "#001b3d",
+                    "primary-fixed": "#d2e4ff",
+                    "on-secondary-container": "#4a6774",
+                    "surface": "#f8f9fa",
+                    "secondary-fixed": "#c9e7f7",
+                    "primary": "#000f22",
+                    "primary-container": "#0a2540",
+                    "on-error-container": "#93000a",
+                    "outline-variant": "#c4c6ce",
+                    "secondary": "#466270",
+                    "tertiary-container": "#00244c",
+                    "on-primary-fixed-variant": "#314865",
+                    "primary-fixed-dim": "#b0c8eb",
+                    "surface-tint": "#49607e",
+                    "on-tertiary": "#ffffff",
+                    "on-primary-fixed": "#001c37",
+                    "surface-container": "#edeeef",
+                    "on-primary-container": "#768dad",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-variant": "#e1e3e4",
+                    "secondary-fixed-dim": "#adcbda",
+                    "on-surface-variant": "#43474d",
+                    "on-background": "#191c1d",
+                    "inverse-on-surface": "#f0f1f2",
+                    "on-secondary": "#ffffff",
+                    "tertiary": "#000f26",
+                    "inverse-surface": "#2e3132",
+                    "on-error": "#ffffff",
+                    "tertiary-fixed": "#d6e3ff",
+                    "on-surface": "#191c1d",
+                    "on-secondary-fixed-variant": "#2e4b57",
+                    "tertiary-fixed-dim": "#a8c8ff",
+                    "error-container": "#ffdad6",
+                    "on-secondary-fixed": "#001f2a"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "margin-desktop": "32px",
+                    "unit": "4px",
+                    "gutter-desktop": "24px",
+                    "container-max-width": "1440px",
+                    "gutter-mobile": "16px",
+                    "margin-mobile": "16px"
+            },
+            "fontFamily": {
+                    "display-lg": ["Inter"],
+                    "label-sm": ["Inter"],
+                    "headline-sm": ["Inter"],
+                    "headline-lg": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "body-md": ["Inter"],
+                    "label-lg": ["Inter"],
+                    "title-lg": ["Inter"],
+                    "label-md": ["Inter"],
+                    "headline-lg-mobile": ["Inter"],
+                    "title-md": ["Inter"]
+            },
+            "fontSize": {
+                    "display-lg": ["57px", {"lineHeight": "64px", "letterSpacing": "-0.25px", "fontWeight": "400"}],
+                    "label-sm": ["11px", {"lineHeight": "16px", "letterSpacing": "0.5px", "fontWeight": "500"}],
+                    "headline-sm": ["24px", {"lineHeight": "32px", "fontWeight": "500"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "600"}],
+                    "body-lg": ["16px", {"lineHeight": "24px", "letterSpacing": "0.5px", "fontWeight": "400"}],
+                    "body-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.25px", "fontWeight": "400"}],
+                    "label-lg": ["14px", {"lineHeight": "20px", "letterSpacing": "0.1px", "fontWeight": "500"}],
+                    "title-lg": ["22px", {"lineHeight": "28px", "fontWeight": "500"}],
+                    "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.5px", "fontWeight": "500"}],
+                    "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "600"}],
+                    "title-md": ["16px", {"lineHeight": "24px", "letterSpacing": "0.15px", "fontWeight": "600"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #c4c6ce; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #74777e; }
+        .data-grid-compact tr:hover { background-color: rgba(243, 244, 245, 0.8); }
+    </style>
+</head>
+<body class="bg-background text-on-background overflow-hidden flex h-screen">
+<!-- SideNavBar Anchor -->
+<aside class="fixed left-0 top-0 h-screen w-[280px] bg-surface-container-lowest border-r border-outline-variant flex flex-col py-8 px-4 gap-2 z-50">
+<div class="flex items-center gap-3 px-3 mb-8">
+<div class="w-10 h-10 bg-primary-container rounded-lg flex items-center justify-center text-on-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">analytics</span>
+</div>
+<div>
+<h1 class="font-display-lg text-title-lg font-bold text-primary">CollectAI</h1>
+<p class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Enterprise Recovery</p>
+</div>
+</div>
+<nav class="flex-1 space-y-1">
+<!-- Dashboard -->
+<a class="flex items-center gap-3 px-3 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors duration-200 rounded-lg group active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label-lg text-label-lg">Dashboard</span>
+</a>
+<!-- Performance (Active) -->
+<a class="flex items-center gap-3 px-3 py-3 bg-primary text-on-primary rounded-lg font-bold active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">query_stats</span>
+<span class="font-label-lg text-label-lg">Performance</span>
+</a>
+<!-- Collector Workbench -->
+<a class="flex items-center gap-3 px-3 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors duration-200 rounded-lg group active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined">work</span>
+<span class="font-label-lg text-label-lg">Collector Workbench</span>
+</a>
+<!-- Customer Detail -->
+<a class="flex items-center gap-3 px-3 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors duration-200 rounded-lg group active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined">group</span>
+<span class="font-label-lg text-label-lg">Customer Detail</span>
+</a>
+<!-- AI Intelligence -->
+<a class="flex items-center gap-3 px-3 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors duration-200 rounded-lg group active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined">psychology</span>
+<span class="font-label-lg text-label-lg">AI Intelligence</span>
+</a>
+</nav>
+<div class="mt-auto border-t border-outline-variant pt-4 px-3">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-container-high overflow-hidden border border-outline-variant">
+<img class="w-full h-full object-cover" data-alt="A professional headshot of a corporate financial analyst in a modern office, high-end photography, soft cinematic lighting, neutral business professional tones." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCm4Abzg531k2eLjeJWoFuu9pEEVy6LCzGv8dQJqBqfvIkv6lpoLPKPuWMlkgE8Tq8RswX6K2VtrH0BxOtHNyfkgDCpjkO4eHYPTUI4Fi1zVcseUV4zi-DzNM0PnGFVjo4nRU0w7H0Q39YLFWotNEQBCj_GT3uXFc92HzXpkfxPtpa8glKBDsnS_SoGQN_4y4gx_5PNVf9swVj1NOhCNZ5liKGxq6z-9zodfJZLpiDquDbdVGILylxgW2V4esV2kWDswgMJ34365gs">
+</div>
+<div class="overflow-hidden">
+<p class="font-label-lg text-label-lg truncate">Budi Santoso</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant truncate">Regional Manager</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-[280px] flex-1 flex flex-col h-screen overflow-hidden relative">
+<!-- TopAppBar Anchor -->
+<header class="h-16 bg-surface border-b border-outline-variant flex items-center justify-between px-8 z-40 sticky top-0">
+<h2 class="font-headline-sm text-headline-sm font-black text-primary">Performance</h2>
+<div class="flex items-center gap-6">
+<div class="relative flex items-center bg-surface-container-low rounded-full px-4 py-1.5 focus-within:ring-2 focus-within:ring-primary group transition-all">
+<span class="material-symbols-outlined text-outline">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-body-md w-64 placeholder:text-outline-variant" placeholder="Search data..." type="text">
+</div>
+<div class="flex items-center gap-2">
+<button class="p-2 rounded-full hover:bg-surface-container-low text-on-surface-variant transition-all">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 rounded-full hover:bg-surface-container-low text-on-surface-variant transition-all">
+<span class="material-symbols-outlined">settings</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Content Canvas -->
+<div class="flex-1 overflow-y-auto p-8 space-y-8">
+<!-- Filters Bar (Interactive Dropdowns) -->
+<section class="grid grid-cols-1 md:grid-cols-4 gap-4 p-5 bg-surface-container-lowest rounded-xl border border-outline-variant">
+<div class="space-y-1.5">
+<label class="font-label-md text-label-md text-outline">Branch</label>
+<div class="relative">
+<select class="w-full appearance-none bg-surface border border-outline-variant rounded-lg px-3 py-2 text-body-md focus:ring-2 focus:ring-primary cursor-pointer">
+<option>All Branches</option>
+<option>Jakarta Pusat</option>
+<option>Surabaya Timur</option>
+<option>Medan Utama</option>
+</select>
+<span class="material-symbols-outlined absolute right-2 top-2.5 pointer-events-none text-outline text-sm">expand_more</span>
+</div>
+</div>
+<div class="space-y-1.5">
+<label class="font-label-md text-label-md text-outline">Area</label>
+<div class="relative">
+<select class="w-full appearance-none bg-surface border border-outline-variant rounded-lg px-3 py-2 text-body-md focus:ring-2 focus:ring-primary cursor-pointer">
+<option>Greater Indonesia</option>
+<option>Java Region</option>
+<option>Sumatra Region</option>
+</select>
+<span class="material-symbols-outlined absolute right-2 top-2.5 pointer-events-none text-outline text-sm">expand_more</span>
+</div>
+</div>
+<div class="space-y-1.5">
+<label class="font-label-md text-label-md text-outline">Product</label>
+<div class="relative">
+<select class="w-full appearance-none bg-surface border border-outline-variant rounded-lg px-3 py-2 text-body-md focus:ring-2 focus:ring-primary cursor-pointer">
+<option>Personal Loan</option>
+<option>Credit Card</option>
+<option>Mortgage</option>
+<option>SME Loan</option>
+</select>
+<span class="material-symbols-outlined absolute right-2 top-2.5 pointer-events-none text-outline text-sm">expand_more</span>
+</div>
+</div>
+<div class="space-y-1.5">
+<label class="font-label-md text-label-md text-outline">Date Range</label>
+<div class="relative">
+<div class="flex items-center gap-2 bg-surface border border-outline-variant rounded-lg px-3 py-2 text-body-md focus-within:ring-2 focus-within:ring-primary cursor-pointer">
+<span class="material-symbols-outlined text-outline text-sm">calendar_today</span>
+<span>Oct 01 - Oct 31, 2023</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Top Level Stats (Bento Style) -->
+<section class="grid grid-cols-12 gap-6">
+<div class="col-span-12 md:col-span-4 p-6 bg-primary-container text-on-primary rounded-xl flex flex-col justify-between min-h-[160px]">
+<div class="flex justify-between items-start">
+<p class="font-label-lg text-on-primary-container">Total Achievement</p>
+<span class="material-symbols-outlined text-primary-fixed">payments</span>
+</div>
+<div>
+<h3 class="font-headline-sm text-headline-sm font-bold">Rp 4.280.000.000</h3>
+<p class="font-label-sm flex items-center gap-1 mt-1 text-primary-fixed">
+<span class="material-symbols-outlined text-sm">trending_up</span> +12.4% from last month
+                        </p>
+</div>
+</div>
+<div class="col-span-12 md:col-span-3 p-6 bg-surface-container-lowest border border-outline-variant rounded-xl flex flex-col justify-between min-h-[160px]">
+<p class="font-label-lg text-outline">Active Collectors</p>
+<div>
+<h3 class="font-headline-sm text-headline-sm font-bold text-primary">142 Users</h3>
+<div class="w-full bg-surface-container-high h-1.5 rounded-full mt-4 overflow-hidden">
+<div class="bg-primary w-[88%] h-full"></div>
+</div>
+</div>
+</div>
+<div class="col-span-12 md:col-span-5 relative bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden min-h-[160px]">
+<div class="absolute inset-0 opacity-20">
+
+</div>
+<div class="relative p-6 h-full flex flex-col justify-between">
+<p class="font-label-lg text-outline">Avg Productivity Index</p>
+<div class="flex items-end gap-4">
+<h3 class="font-display-lg text-4xl font-black text-primary">8.4</h3>
+<div class="flex gap-1 pb-2">
+<div class="h-4 w-1 bg-primary"></div>
+<div class="h-6 w-1 bg-primary"></div>
+<div class="h-8 w-1 bg-primary"></div>
+<div class="h-5 w-1 bg-primary"></div>
+<div class="h-7 w-1 bg-primary"></div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- High-Density Tabular Grid -->
+<section class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm overflow-hidden">
+<div class="p-6 border-b border-outline-variant flex justify-between items-center bg-surface">
+<h3 class="font-title-md text-title-md text-primary">Collector Ranking &amp; Productivity</h3>
+<div class="flex gap-2">
+<button class="flex items-center gap-2 px-3 py-1.5 bg-surface border border-outline-variant rounded-lg font-label-lg text-on-surface-variant hover:bg-surface-container-low transition-all">
+<span class="material-symbols-outlined text-sm">download</span> Export CSV
+                        </button>
+<button class="flex items-center gap-2 px-3 py-1.5 bg-primary text-on-primary rounded-lg font-label-lg hover:opacity-90 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">add</span> Bulk Action
+                        </button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse data-grid-compact">
+<thead>
+<tr class="bg-surface-container-low">
+<th class="px-6 py-4 font-label-lg text-label-lg text-outline uppercase tracking-wider">Rank</th>
+<th class="px-6 py-4 font-label-lg text-label-lg text-outline uppercase tracking-wider">Collector Name</th>
+<th class="px-6 py-4 font-label-lg text-label-lg text-outline uppercase tracking-wider text-right">Target (Rp)</th>
+<th class="px-6 py-4 font-label-lg text-label-lg text-outline uppercase tracking-wider text-right">Achievement (Rp)</th>
+<th class="px-6 py-4 font-label-lg text-label-lg text-outline uppercase tracking-wider">Collection %</th>
+<th class="px-6 py-4 font-label-lg text-label-lg text-outline uppercase tracking-wider">Productivity Index</th>
+<th class="px-6 py-4 font-label-lg text-label-lg text-outline uppercase tracking-wider">Status</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant">
+<!-- Row 1 -->
+<tr class="transition-colors group">
+<td class="px-6 py-3">
+<div class="flex items-center gap-2">
+<span class="w-6 h-6 flex items-center justify-center bg-yellow-100 text-yellow-800 rounded-full font-bold text-xs">1</span>
+<span class="material-symbols-outlined text-yellow-600 text-sm" style="font-variation-settings: 'FILL' 1;">workspace_premium</span>
+</div>
+</td>
+<td class="px-6 py-3">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-surface-container-high flex-shrink-0 border border-outline-variant overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="A small avatar of a male professional, focused expression, corporate attire, studio lighting, clean background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDO7jS8jIuid2qcClTwhJoI9kdk5PkxSMi70S-CaSCMv4TsX39vkT80wM8vVaKWn0vMU21PNYAk7pDpkal3_gNKpOMG4rpTr9wxtWN7tHN9C9Q0y1oTPg16UFjeE_sluZb09clOR_y-UfhKVsOPjrRTfO1WLamOd409favNjXfWqiQja8h99gnjnEV0o-sz7t6d3P44heRHVmR5bh29Sl706DOU_8Y3l5FCP28MUNFl8oDLxLwSsFjLZDyUvzAdRUdhDrHOJOQNcLU">
+</div>
+<div>
+<p class="font-body-md font-bold text-primary">Aditya Nugroho</p>
+<p class="font-label-sm text-outline">Emp ID: #99281</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-3 text-right font-body-md text-on-surface">500,000,000</td>
+<td class="px-6 py-3 text-right font-body-md font-bold text-primary">485,250,000</td>
+<td class="px-6 py-3">
+<div class="flex items-center gap-2">
+<span class="font-body-md font-bold text-primary">97.05%</span>
+<div class="w-16 h-1.5 bg-surface-container-high rounded-full overflow-hidden">
+<div class="bg-green-600 h-full w-[97%]"></div>
+</div>
+</div>
+</td>
+<td class="px-6 py-3">
+<div class="inline-flex items-center px-2 py-0.5 rounded bg-surface-container-high text-primary font-bold text-xs">9.8</div>
+</td>
+<td class="px-6 py-3">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Elite</span>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="transition-colors group">
+<td class="px-6 py-3">
+<span class="w-6 h-6 flex items-center justify-center bg-slate-100 text-slate-800 rounded-full font-bold text-xs">2</span>
+</td>
+<td class="px-6 py-3">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-surface-container-high flex-shrink-0 border border-outline-variant overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="A small avatar portrait of a female corporate professional, smiling confidently, modern business environment, bright and airy lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCOPhlc7-9WoEEC32kA7XsbLMK6ts_LsIWeDTvY7ZUX7IggsaS39ZOpI9ATZy0ESt5kaEdc3LM1P383sPHoXlyRWh-jn6SAH3WtnRHYGMJRwt7quagkhB5cdEr1Rjxlx6HCMDYC5akkKvcQGObk4taI0s1wssbGnqnXql5QWFbbbVy2M16NzIpwk8RcBUCu6bimJzwJwxyvi9RYNyBJlSk9SW9yuThf-nigXltJIFhDro8qInWzMNaIbvZdu4vYYqriNJWfS0aKNUw">
+</div>
+<div>
+<p class="font-body-md font-bold text-primary">Siti Rahmawati</p>
+<p class="font-label-sm text-outline">Emp ID: #99304</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-3 text-right font-body-md text-on-surface">450,000,000</td>
+<td class="px-6 py-3 text-right font-body-md font-bold text-primary">412,000,000</td>
+<td class="px-6 py-3">
+<div class="flex items-center gap-2">
+<span class="font-body-md font-bold text-primary">91.56%</span>
+<div class="w-16 h-1.5 bg-surface-container-high rounded-full overflow-hidden">
+<div class="bg-green-600 h-full w-[91%]"></div>
+</div>
+</div>
+</td>
+<td class="px-6 py-3">
+<div class="inline-flex items-center px-2 py-0.5 rounded bg-surface-container-high text-primary font-bold text-xs">9.2</div>
+</td>
+<td class="px-6 py-3">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Elite</span>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="transition-colors group">
+<td class="px-6 py-3">
+<span class="w-6 h-6 flex items-center justify-center bg-orange-100 text-orange-800 rounded-full font-bold text-xs">3</span>
+</td>
+<td class="px-6 py-3">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-surface-container-high flex-shrink-0 border border-outline-variant overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="A small avatar of an Asian male professional in a modern office setting, bright studio lighting, confident demeanor." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBzSp1qXuPpoyHw7vm6-Dr1SJslxcQkJRCXvvgrenbFoNrTUfEOv2f0qpm4lRFMvPGms3f7dA1-A9kJLu_ASj3avFCzQJ08cvZNGaMxwKROMifi5Bj6aUJzYn9ZxLzpFgBRyljaDHfeki55QTgI0NX7C-q3vXqjRyV9QY5K8pQAm5kncowxVdC-rNJi5d80oWegP_Zjsx4HDvjQzLND0qHJSKOo1kOnst38RqC7ejvAd4mYYxVvMLYlTMByu4Qo4pM-d9xMGE5tYzM">
+</div>
+<div>
+<p class="font-body-md font-bold text-primary">Hendrik Wijaya</p>
+<p class="font-label-sm text-outline">Emp ID: #99212</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-3 text-right font-body-md text-on-surface">600,000,000</td>
+<td class="px-6 py-3 text-right font-body-md font-bold text-primary">520,000,000</td>
+<td class="px-6 py-3">
+<div class="flex items-center gap-2">
+<span class="font-body-md font-bold text-primary">86.67%</span>
+<div class="w-16 h-1.5 bg-surface-container-high rounded-full overflow-hidden">
+<div class="bg-blue-600 h-full w-[86%]"></div>
+</div>
+</div>
+</td>
+<td class="px-6 py-3">
+<div class="inline-flex items-center px-2 py-0.5 rounded bg-surface-container-high text-primary font-bold text-xs">8.5</div>
+</td>
+<td class="px-6 py-3">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Advanced</span>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="transition-colors group">
+<td class="px-6 py-3">
+<span class="w-6 h-6 flex items-center justify-center bg-gray-100 text-gray-800 rounded-full font-bold text-xs">4</span>
+</td>
+<td class="px-6 py-3">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-surface-container-high flex-shrink-0 border border-outline-variant overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Corporate headshot of a mature financial professional, soft lighting, professional background, clean look." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD4zHk7mryp-x8gfAq4DIfPUaXu3_yUk3aNDk84vujAr6qvaIqju3R8dXabxGHfAcIrXBa6Xas6LltfcpMJGN_7l-ivf2Q5tXA-sbR6cnuX-0txhNzL09pl_5pEutLB4yW_5QfsBaOZP4SVwJQz8HAyv-K4AfASA4hwczXxkuy6TJiczPkwp_PFuDFIEPiWm91uF2KIesjDl_kW9Q9Y9UkYODhPMHKqHmHypPLNNJFK5aSmiPCI6og9Mgc22ZB5M_lv5yTvio4c0J0">
+</div>
+<div>
+<p class="font-body-md font-bold text-primary">Indah Permata</p>
+<p class="font-label-sm text-outline">Emp ID: #99554</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-3 text-right font-body-md text-on-surface">400,000,000</td>
+<td class="px-6 py-3 text-right font-body-md font-bold text-primary">320,000,000</td>
+<td class="px-6 py-3">
+<div class="flex items-center gap-2">
+<span class="font-body-md font-bold text-primary">80.00%</span>
+<div class="w-16 h-1.5 bg-surface-container-high rounded-full overflow-hidden">
+<div class="bg-blue-600 h-full w-[80%]"></div>
+</div>
+</div>
+</td>
+<td class="px-6 py-3">
+<div class="inline-flex items-center px-2 py-0.5 rounded bg-surface-container-high text-primary font-bold text-xs">7.9</div>
+</td>
+<td class="px-6 py-3">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Advanced</span>
+</td>
+</tr>
+<!-- Row 5 (Low Performance Example) -->
+<tr class="transition-colors group">
+<td class="px-6 py-3">
+<span class="w-6 h-6 flex items-center justify-center bg-gray-100 text-gray-800 rounded-full font-bold text-xs">5</span>
+</td>
+<td class="px-6 py-3">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-surface-container-high flex-shrink-0 border border-outline-variant overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Small profile avatar of a young professional, professional setting, bright natural light." src="https://lh3.googleusercontent.com/aida-public/AB6AXuABhJ6fz0tCOcODg7-zv_m3m-VTq80ciRD5o3ro3hwFqI3hufh83FSuj7994FryouyYzYgIuoXl7QSTqCv8UzLq1SLjC5AaOG0iaflYpW7IBsBs1HMJ438N_Bl0QtwINO6J0387mQSkt1fQeCZeOF4qFru5CqEaJ352I4FxNAVh_20NcvSs2BuHx1BDJGoPReXU-0PKlg2jrymmyeBfMctk8eWfVtUEYosqM71e15rshcV56trN7glMfOSPPpUA4efomp5zRGrxd48">
+</div>
+<div>
+<p class="font-body-md font-bold text-primary">Reza Pratama</p>
+<p class="font-label-sm text-outline">Emp ID: #99401</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-3 text-right font-body-md text-on-surface">400,000,000</td>
+<td class="px-6 py-3 text-right font-body-md font-bold text-primary">210,000,000</td>
+<td class="px-6 py-3">
+<div class="flex items-center gap-2">
+<span class="font-body-md font-bold text-primary">52.50%</span>
+<div class="w-16 h-1.5 bg-surface-container-high rounded-full overflow-hidden">
+<div class="bg-red-600 h-full w-[52%]"></div>
+</div>
+</div>
+</td>
+<td class="px-6 py-3">
+<div class="inline-flex items-center px-2 py-0.5 rounded bg-surface-container-high text-primary font-bold text-xs text-error">4.2</div>
+</td>
+<td class="px-6 py-3">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">At Risk</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="p-4 bg-surface border-t border-outline-variant flex items-center justify-between">
+<p class="font-label-sm text-outline text-label-sm">Showing 1 to 5 of 142 collectors</p>
+<div class="flex items-center gap-2">
+<button class="w-8 h-8 flex items-center justify-center rounded-lg border border-outline-variant hover:bg-surface-container-low transition-all">
+<span class="material-symbols-outlined text-sm">chevron_left</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center rounded-lg bg-primary text-on-primary font-bold text-xs">1</button>
+<button class="w-8 h-8 flex items-center justify-center rounded-lg border border-outline-variant hover:bg-surface-container-low transition-all text-xs font-bold">2</button>
+<button class="w-8 h-8 flex items-center justify-center rounded-lg border border-outline-variant hover:bg-surface-container-low transition-all text-xs font-bold">3</button>
+<button class="w-8 h-8 flex items-center justify-center rounded-lg border border-outline-variant hover:bg-surface-container-low transition-all">
+<span class="material-symbols-outlined text-sm">chevron_right</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Bottom Operational Log -->
+<section class="bg-surface-container-lowest rounded-xl border border-outline-variant p-6">
+<div class="flex items-center gap-2 mb-4">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">history</span>
+<h3 class="font-title-md text-title-md text-primary">Log Operasional Terkini</h3>
+</div>
+<div class="space-y-4">
+<div class="flex gap-4 relative">
+<div class="absolute top-2 left-[7px] bottom-0 w-[1px] bg-outline-variant"></div>
+<div class="w-4 h-4 rounded-full bg-primary flex-shrink-0 z-10 border-4 border-surface"></div>
+<div>
+<p class="font-body-md text-on-surface">Sistem memperbarui target bulanan untuk cabang Jakarta Pusat.</p>
+<p class="font-label-sm text-outline">Hari ini, 09:12 AM</p>
+</div>
+</div>
+<div class="flex gap-4 relative">
+<div class="absolute top-2 left-[7px] bottom-0 w-[1px] bg-outline-variant"></div>
+<div class="w-4 h-4 rounded-full bg-green-600 flex-shrink-0 z-10 border-4 border-surface"></div>
+<div>
+<p class="font-body-md text-on-surface">Aditya Nugroho mencapai 110% dari target harian produk Personal Loan.</p>
+<p class="font-label-sm text-outline">Hari ini, 08:45 AM</p>
+</div>
+</div>
+<div class="flex gap-4">
+<div class="w-4 h-4 rounded-full bg-outline flex-shrink-0 z-10 border-4 border-surface"></div>
+<div>
+<p class="font-body-md text-on-surface">Sinkronisasi data otomatis dari server pusat selesai dilakukan.</p>
+<p class="font-label-sm text-outline">Kemarin, 11:30 PM</p>
+</div>
+</div>
+</div>
+</section>
+</div>
+<!-- Floating Action Button (Suppressed on Performance/Detail as per guidelines, but keeping context check) -->
+<!-- Suppressed as this is a high-density data screen -->
+</main>
+<script>
+        // Micro-interaction: Sorting indicators
+        document.querySelectorAll('th').forEach(header => {
+            header.addEventListener('click', () => {
+                // Toggle sorting visual (logic would go here in a real app)
+                console.log('Sorting by: ' + header.innerText);
+                header.classList.toggle('bg-surface-container-high');
+            });
+            header.style.cursor = 'pointer';
+        });
+
+        // Dropdown interactions
+        document.querySelectorAll('select').forEach(select => {
+            select.addEventListener('change', (e) => {
+                const toast = document.createElement('div');
+                toast.className = 'fixed bottom-8 right-8 bg-primary-container text-on-primary px-6 py-3 rounded-lg shadow-xl z-50 flex items-center gap-3 animate-bounce';
+                toast.innerHTML = `<span class="material-symbols-outlined">filter_list</span> Updating view for ${e.target.value}...`;
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 2000);
+            });
+        });
+    </script>
+</body></html>
