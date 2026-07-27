@@ -3,9 +3,12 @@ services:
     image: postgres:16-alpine
     container_name: collectai_db
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: changeme
-      POSTGRES_DB: collect_ai
+      # Values pulled from the root .env (docker compose auto-loads it for ${...}
+      # substitution) — same PGUSER/PGPASSWORD/PGDATABASE as .env.example, just
+      # remapped to the names the postgres image itself expects.
+      POSTGRES_USER: ${PGUSER:-postgres}
+      POSTGRES_PASSWORD: ${PGPASSWORD:-changeme}
+      POSTGRES_DB: ${PGDATABASE:-collect_ai}
     ports:
       - "5433:5432" # host 5433 -> avoid clobbering a locally-running Postgres on 5432
     volumes:
@@ -24,18 +27,19 @@ services:
       dockerfile: app/backend/Dockerfile
     container_name: collectai_be
     environment:
-      # Real env vars, not a mounted .env file — pydantic-settings' env_file
-      # lookup is best-effort and silently skipped if missing; real process
-      # env vars always take precedence over it anyway. See core/config.py.
+      # PGHOST/PGPORT are deliberately NOT read from .env: that file's PGHOST=localhost
+      # is for running app/backend directly on the host — inside the compose network,
+      # the backend must reach Postgres via the service name "db" instead.
       PGHOST: db
       PGPORT: "5432"
-      PGUSER: postgres
-      PGPASSWORD: changeme
-      PGDATABASE: collect_ai
-      JWT_SECRET: dev-only-change-me-this-is-not-a-real-secret-32bytes
-      JWT_ALGORITHM: HS256
-      JWT_EXPIRE_MINUTES: "1440"
-      CORS_ALLOW_ORIGINS: '["http://localhost:5173"]'
+      # Everything else comes straight from the root .env, same keys as .env.example.
+      PGUSER: ${PGUSER:-postgres}
+      PGPASSWORD: ${PGPASSWORD:-changeme}
+      PGDATABASE: ${PGDATABASE:-collect_ai}
+      JWT_SECRET: ${JWT_SECRET:-dev-only-change-me-this-is-not-a-real-secret-32bytes}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-1440}
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-["http://localhost:5173"]}
     ports:
       - "8000:8000"
     volumes:
