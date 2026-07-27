@@ -1,0 +1,15 @@
+.git
+node_modules
+__pycache__/
+*.pyc
+.venv/
+.venv-check/
+venv/
+.env
+.pytest_cache/
+.coverage
+.stitch
+.claude
+.agents
+*.xlsx
+dataset_kredit.jsonl

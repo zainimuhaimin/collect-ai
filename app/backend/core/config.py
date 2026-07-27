@@ -24,6 +24,14 @@ class Settings(BaseSettings):
     pgpassword: str = ""
     pgdatabase: str = "collect_ai"
 
+    # Auth — token opaque di sisi frontend (tidak pernah di-decode di client),
+    # jadi JWT stateless di sini sudah cukup, tidak perlu tabel session.
+    jwt_secret: str = "dev-only-change-me-this-is-not-a-real-secret-32bytes"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 60 * 24  # 1 hari — frontend belum ada alur refresh token
+
+    cors_allow_origins: list[str] = ["http://localhost:5173"]
+
     @property
     def database_url(self) -> str:
         return f"postgresql://{self.pguser}:{self.pgpassword}@{self.pghost}:{self.pgport}/{self.pgdatabase}"

@@ -1,0 +1,70 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: collectai_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: changeme
+      POSTGRES_DB: collect_ai
+    ports:
+      - "5433:5432" # host 5433 -> avoid clobbering a locally-running Postgres on 5432
+    volumes:
+      - collectai_pgdata:/var/lib/postgresql/data
+      - ./app/machine-learning/config/schema_combined.sql:/docker-entrypoint-initdb.d/01-schema_combined.sql:ro
+      - ./app/backend/db/schema_users.sql:/docker-entrypoint-initdb.d/02-schema_users.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d collect_ai"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  be:
+    build:
+      context: .
+      dockerfile: app/backend/Dockerfile
+    container_name: collectai_be
+    environment:
+      # Real env vars, not a mounted .env file — pydantic-settings' env_file
+      # lookup is best-effort and silently skipped if missing; real process
+      # env vars always take precedence over it anyway. See core/config.py.
+      PGHOST: db
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: changeme
+      PGDATABASE: collect_ai
+      JWT_SECRET: dev-only-change-me-this-is-not-a-real-secret-32bytes
+      JWT_ALGORITHM: HS256
+      JWT_EXPIRE_MINUTES: "1440"
+      CORS_ALLOW_ORIGINS: '["http://localhost:5173"]'
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app/backend:/app
+      # The bind mount above replaces the whole /app tree with host content, which
+      # would hide the image's baked-in ./shared/ copy — remount it explicitly so
+      # `from shared.restructuring_offer_calculator import ...` keeps resolving.
+      - ./app/shared:/app/shared
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    image: node:24-alpine
+    container_name: collectai_frontend
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    environment:
+      VITE_API_BASE_URL: /api
+      VITE_ENABLE_MSW: "true"
+      VITE_API_PROXY_TARGET: http://be:8000
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./app/frontend:/app
+      - collectai_frontend_node_modules:/app/node_modules
+    depends_on:
+      - be
+
+volumes:
+  collectai_pgdata:
+  collectai_frontend_node_modules:
