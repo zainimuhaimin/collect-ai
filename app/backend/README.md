@@ -43,7 +43,11 @@ pip install -r requirements.txt
 #    Kredensial ini dipakai bersama oleh backend, machine-learning, dan core-banking.
 cat ../../.env.example   # copy jadi ../../.env kalau belum ada, isi kredensial asli
 
-# 3. Jalankan server
+# 3. Buat tabel `users` (sekali saja, idempotent) + seed satu dev user
+psql -h $PGHOST -U $PGUSER -d $PGDATABASE -f db/schema_users.sql
+python -m scripts.seed_dev_user   # -> admin / admin123 (dev-only, lihat scripts/seed_dev_user.py)
+
+# 4. Jalankan server
 uvicorn main:app --reload
 ```
 
@@ -112,6 +116,34 @@ Response error yang mungkin muncul:
 | 404 | `cust_id` atau `restructure_group_id` tidak ditemukan |
 | 409 | Tawaran masih `GENERATED` (belum di-approve) atau sudah pernah direspons |
 | 410 | Tawaran sudah lewat `expiry_date` |
+
+### 6. Login
+
+Tidak ada endpoint register publik — user diprovisioning lewat
+`scripts/seed_dev_user.py` (lihat Quick Start di atas untuk setup satu kali).
+
+```bash
+curl -X POST http://localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "admin123"}'
+```
+
+Response `200` berisi `token` (bearer, opaque — jangan didekode di frontend)
+dan `user` (`name`/`role`/`initials`). Password salah atau username tidak
+ditemukan -> `401`.
+
+### 7. Profil user yang sedang login
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "admin123"}' | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+
+curl http://localhost:8000/api/v1/auth/me -H "Authorization: Bearer $TOKEN"
+```
+
+Token tidak ada/tidak valid/kedaluwarsa -> `401` (bukan `403` — frontend hanya
+treat `401` sebagai sinyal logout, lihat `core/dependencies.py`).
 
 ## Testing
 

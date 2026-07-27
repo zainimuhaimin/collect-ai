@@ -12,7 +12,7 @@ from abc import ABC, abstractmethod
 from datetime import date
 from typing import List, Optional
 
-from domain.models import Contract, Customer, RestructuringOfferRecord
+from domain.models import Contract, Customer, RestructuringOfferRecord, User
 
 
 class ICustomerRepository(ABC):
@@ -55,4 +55,23 @@ class IRestructuringOfferRepository(ABC):
     ) -> bool:
         """Update offer_status -> ACCEPTED/REJECTED + response_date.
         Return False kalau restructure_group_id tidak ditemukan."""
+        ...
+
+
+class IUserRepository(ABC):
+    """Akses ke tabel users (login/identity) — bukan bagian dari data
+    customer/kontrak, jadi sengaja dipisah interface-nya (ISP)."""
+
+    @abstractmethod
+    def get_by_username(self, username: str) -> Optional[User]:
+        ...
+
+    @abstractmethod
+    def get_by_id(self, user_id: int) -> Optional[User]:
+        ...
+
+    @abstractmethod
+    def create(self, *, username: str, password_hash: str, name: str, role: str) -> User:
+        """Dipakai oleh scripts/seed_dev_user.py (provisioning), bukan oleh
+        endpoint login/me manapun — tidak ada endpoint register publik."""
         ...

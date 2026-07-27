@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from api.v1.api import api_router
 from core.config import settings
@@ -7,6 +8,11 @@ TAGS_METADATA = [
     {
         "name": "health",
         "description": "Cek service backend hidup dan bisa dijangkau.",
+    },
+    {
+        "name": "auth",
+        "description": "Login (username/password -> bearer token) dan profil user yang "
+        "sedang login. Token opaque, tanpa alur refresh — expiry hanya diketahui lewat 401.",
     },
     {
         "name": "customers",
@@ -48,6 +54,18 @@ app = FastAPI(
     version=settings.app_version,
     description=DESCRIPTION,
     openapi_tags=TAGS_METADATA,
+)
+
+# Tidak ada docker-compose/Vite dev-proxy di repo ini saat ini — kalau frontend
+# dijalankan langsung lewat `npm run dev` (:5173), browser memanggil backend ini
+# (:8000) cross-origin, jadi CORS wajib ada supaya request (termasuk header
+# Authorization) tidak diblokir browser.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_allow_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(api_router, prefix=settings.api_v1_prefix)

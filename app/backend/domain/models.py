@@ -35,6 +35,16 @@ class Contract:
 
 
 @dataclass
+class User:
+    id: int
+    username: str
+    password_hash: str
+    name: str
+    role: str               # label tampilan bebas, mis. 'Regional Manager' — bukan enum/RBAC
+    is_active: bool = True
+
+
+@dataclass
 class RestructuringOfferRecord:
     """Satu baris restructuring_recommendation_output — dipakai untuk
     validasi transisi status (bukan hasil kalkulasi ml/, itu tetap
