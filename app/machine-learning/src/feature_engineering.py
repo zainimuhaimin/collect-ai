@@ -24,6 +24,7 @@ from config.settings import (
     WEIGHT_PTP_RELIABILITY,
     WEIGHT_INTERACTION,
     WEIGHT_DELAY_SCORE,
+    MIN_MONTHS_POST_RESTRUCTURE_FOR_TRAINING,
 )
 
 
@@ -144,6 +145,26 @@ def compute_contract_features(
 
     out["overdue_installment_count"] = overdue_src.fillna(0).astype(int)
     out["late_fee_amount"] = late_fee_src.fillna(0).astype(float)
+
+    # ── Restructuring lineage flags (TASK-53) ──────────────────────
+    # is_restructured: kontrak ini adalah kontrak BARU hasil restrukturisasi
+    # (dituju oleh new_contract_no dari kontrak lama yang closed_via_restructure).
+    # months_since_restructure: default 0 (paling konservatif — dianggap
+    # BARU SAJA direstrukturisasi) untuk kontrak yang ter-flag is_restructured
+    # tapi belum ada catatan restructure_date presisi (lihat
+    # enrich_restructure_lineage() untuk versi dengan tanggal presisi dari
+    # restructuring_recommendation_output).
+    new_contract_targets = set(
+        _pick_col(c, "new_contract_no").dropna().loc[lambda s: s != ""].tolist()
+    )
+    out["is_restructured"] = out["contract_no"].isin(new_contract_targets).astype(int)
+    out["months_since_restructure"] = 0
+    out.loc[out["is_restructured"] == 0, "months_since_restructure"] = 999
+
+    # closed_via_restructure: pass-through mentah dari contract_snapshot —
+    # training pipeline WAJIB memfilter baris ini (lihat filter_restructured_for_training()).
+    closed_src = _pick_col(c, "closed_via_restructure", default=False)
+    out["closed_via_restructure"] = closed_src.fillna(False).astype(bool)
 
     # ── Payment aggregates ────────────────────────────────────────
     if not p.empty and "contract_no" in p.columns:
@@ -513,3 +534,40 @@ def enrich_with_cbs(df_contract_features: pd.DataFrame, df_cbs: pd.DataFrame) ->
 
     merged = cf.merge(cbs_sub, on="cust_id", how="left")
     return merged.drop_duplicates(subset=["contract_no"]).copy()
+
+
+# ────────────────────────────────────────────────────────────────────
+# Restructuring lineage filter (TASK-53, restructuring-engine-tasks.md)
+# ────────────────────────────────────────────────────────────────────
+
+def filter_restructured_for_training(
+    df_features: pd.DataFrame,
+    min_months_post_restructure: int = MIN_MONTHS_POST_RESTRUCTURE_FOR_TRAINING,
+) -> pd.DataFrame:
+    """Keluarkan kontrak yang tersentuh restrukturisasi dari training set
+    4 model existing (recovery/self_cure/roll_forward/ptp_success):
+
+    - closed_via_restructure=True (kontrak LAMA yang sudah ditutup lewat
+      restrukturisasi) — selalu dikeluarkan, tidak relevan lagi.
+    - is_restructured=1 (kontrak BARU hasil restrukturisasi) DAN belum
+      genap `min_months_post_restructure` bulan berjalan — dikeluarkan
+      sementara supaya DPD yang "reset" administratif tidak disalahartikan
+      model sebagai perbaikan perilaku genuine.
+
+    WAJIB dipanggil di semua pipeline training (train_initial_model.py,
+    train_self_cure.py, train_roll_forward.py, train_ptp_success.py)
+    setelah compute_contract_features(), SEBELUM build_target_variable().
+    """
+    out = df_features.copy()
+    closed = out["closed_via_restructure"].astype(bool) if "closed_via_restructure" in out.columns else False
+    is_restructured = out["is_restructured"] if "is_restructured" in out.columns else 0
+    months_since = out["months_since_restructure"] if "months_since_restructure" in out.columns else 999
+
+    too_recent = (is_restructured == 1) & (months_since < min_months_post_restructure)
+    excluded = closed | too_recent
+
+    n_excluded = int(excluded.sum()) if hasattr(excluded, "sum") else 0
+    if n_excluded:
+        print(f"[Lineage Filter] {n_excluded:,} kontrak dikeluarkan dari training (restrukturisasi)")
+
+    return out[~excluded].copy()

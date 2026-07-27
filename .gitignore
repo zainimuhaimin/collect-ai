@@ -4,3 +4,7 @@ venv
 .coverage
 .pytest_cache
 .agent
+.agents
+.stitch
+.claude
+.env

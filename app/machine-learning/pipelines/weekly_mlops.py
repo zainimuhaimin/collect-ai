@@ -38,7 +38,11 @@ from config.settings import (  # noqa: E402
     MODEL_TYPE_FEATURE_COLS,
     MODEL_TYPE_TARGET_COL,
 )
-from src.outcome_labeler import label_historical_scores, get_labeled_dataset  # noqa: E402
+from src.outcome_labeler import (  # noqa: E402
+    label_historical_scores,
+    get_labeled_dataset,
+    label_restructuring_outcomes,
+)
 from src.model_monitor import (  # noqa: E402
     compute_model_performance,
     run_drift_detection,
@@ -67,6 +71,7 @@ from src.feature_engineering import (  # noqa: E402
     compute_contract_features,
     compute_customer_features,
     enrich_with_cbs,
+    filter_restructured_for_training,
 )
 from src.cbs_builder import build_cbs  # noqa: E402
 
@@ -289,6 +294,16 @@ def run_weekly_mlops(reference_date=None):
     new_labels = label_historical_scores(df_ai_output, df_payment, engine=engine)
     print(f"[MLOps] New labels appended: {len(new_labels):,}")
 
+    # TASK-55 — capture hasil aktual tawaran restrukturisasi yang statusnya
+    # sudah bergerak (ACCEPTED/REJECTED). Ini bahan baku SATU-SATUNYA untuk
+    # model acceptance probability Fase 2 (belum dibangun — lihat Catatan #3
+    # restructuring-engine-tasks.md).
+    try:
+        new_restructure_labels = label_restructuring_outcomes(engine, reference_date=ref_date)
+        print(f"[MLOps] Restructuring history baru: {len(new_restructure_labels):,}")
+    except Exception as exc:
+        print(f"[MLOps] Label restructuring outcomes gagal (dilewati): {exc}")
+
     # ── STEP 2: Bangun labeled dataset ────────────────────────────
     print("\n[MLOps] Step 2/9 — Building labeled training set...")
     df_labeled = _build_labeled_training_set(engine)
@@ -381,7 +396,7 @@ def run_weekly_mlops(reference_date=None):
             reason_parts.append("feature drift critical")
         print(f"[MLOps] Retrain reason: {', '.join(reason_parts)}")
 
-        train_df = df_labeled.copy()
+        train_df = filter_restructured_for_training(df_labeled.copy())
         # Pastikan semua feature cols tersedia (isi 0 jika tidak ada)
         for col in FEATURE_COLS:
             if col not in train_df.columns:

@@ -6,12 +6,12 @@
         "path": "/Users/mcdmobiledev11/Development/MCD/collect-ai/app/machine-learning/models/recovery_model_champion.pkl",
         "role": "champion",
         "model_type": "recovery",
-        "registered": "2026-07-19T20:23:58.707773",
+        "registered": "2026-07-21T16:53:07.312975",
         "strategy": "recency_weighted",
-        "n_samples": 722,
-        "auc": 0.9599,
+        "n_samples": 721,
+        "auc": 0.9624,
         "decay_rate": 0.7,
-        "trained_at": "2026-07-19T20:23:58.701052"
+        "trained_at": "2026-07-21T16:53:07.309016"
       },
       "current_challenger": null,
       "history": [
@@ -20,12 +20,12 @@
           "path": "/Users/mcdmobiledev11/Development/MCD/collect-ai/app/machine-learning/models/recovery_model_champion.pkl",
           "role": "champion",
           "model_type": "recovery",
-          "registered": "2026-07-19T20:23:58.707773",
+          "registered": "2026-07-21T16:53:07.312975",
           "strategy": "recency_weighted",
-          "n_samples": 722,
-          "auc": 0.9599,
+          "n_samples": 721,
+          "auc": 0.9624,
           "decay_rate": 0.7,
-          "trained_at": "2026-07-19T20:23:58.701052"
+          "trained_at": "2026-07-21T16:53:07.309016"
         }
       ]
     },
@@ -35,12 +35,12 @@
         "path": "/Users/mcdmobiledev11/Development/MCD/collect-ai/app/machine-learning/models/self_cure_model.pkl",
         "role": "champion",
         "model_type": "self_cure",
-        "registered": "2026-07-19T20:24:24.208701",
+        "registered": "2026-07-21T16:53:32.628091",
         "strategy": "recency_weighted",
-        "n_samples": 552,
-        "auc": 0.7966,
+        "n_samples": 533,
+        "auc": 0.7648,
         "decay_rate": 0.7,
-        "trained_at": "2026-07-19T20:24:24.202269"
+        "trained_at": "2026-07-21T16:53:32.623788"
       },
       "current_challenger": null,
       "history": [
@@ -49,12 +49,12 @@
           "path": "/Users/mcdmobiledev11/Development/MCD/collect-ai/app/machine-learning/models/self_cure_model.pkl",
           "role": "champion",
           "model_type": "self_cure",
-          "registered": "2026-07-19T20:24:24.208701",
+          "registered": "2026-07-21T16:53:32.628091",
           "strategy": "recency_weighted",
-          "n_samples": 552,
-          "auc": 0.7966,
+          "n_samples": 533,
+          "auc": 0.7648,
           "decay_rate": 0.7,
-          "trained_at": "2026-07-19T20:24:24.202269"
+          "trained_at": "2026-07-21T16:53:32.623788"
         }
       ]
     },
@@ -64,12 +64,12 @@
         "path": "/Users/mcdmobiledev11/Development/MCD/collect-ai/app/machine-learning/models/roll_forward_model.pkl",
         "role": "champion",
         "model_type": "roll_forward",
-        "registered": "2026-07-19T20:25:09.094026",
+        "registered": "2026-07-21T16:53:34.395972",
         "strategy": "recency_weighted",
-        "n_samples": 416,
-        "auc": 0.8928,
+        "n_samples": 446,
+        "auc": 0.8961,
         "decay_rate": 0.7,
-        "trained_at": "2026-07-19T20:25:09.086994"
+        "trained_at": "2026-07-21T16:53:34.392172"
       },
       "current_challenger": null,
       "history": [
@@ -78,12 +78,12 @@
           "path": "/Users/mcdmobiledev11/Development/MCD/collect-ai/app/machine-learning/models/roll_forward_model.pkl",
           "role": "champion",
           "model_type": "roll_forward",
-          "registered": "2026-07-19T20:25:09.094026",
+          "registered": "2026-07-21T16:53:34.395972",
           "strategy": "recency_weighted",
-          "n_samples": 416,
-          "auc": 0.8928,
+          "n_samples": 446,
+          "auc": 0.8961,
           "decay_rate": 0.7,
-          "trained_at": "2026-07-19T20:25:09.086994"
+          "trained_at": "2026-07-21T16:53:34.392172"
         }
       ]
     },
@@ -93,12 +93,12 @@
         "path": "/Users/mcdmobiledev11/Development/MCD/collect-ai/app/machine-learning/models/ptp_success_model.pkl",
         "role": "champion",
         "model_type": "ptp_success",
-        "registered": "2026-07-19T20:25:26.124648",
+        "registered": "2026-07-21T16:53:36.066640",
         "strategy": "recency_weighted",
-        "n_samples": 109,
-        "auc": 0.7871,
+        "n_samples": 117,
+        "auc": 0.8146,
         "decay_rate": 0.7,
-        "trained_at": "2026-07-19T20:25:26.118331"
+        "trained_at": "2026-07-21T16:53:36.063134"
       },
       "current_challenger": null,
       "history": [
@@ -107,12 +107,12 @@
           "path": "/Users/mcdmobiledev11/Development/MCD/collect-ai/app/machine-learning/models/ptp_success_model.pkl",
           "role": "champion",
           "model_type": "ptp_success",
-          "registered": "2026-07-19T20:25:26.124648",
+          "registered": "2026-07-21T16:53:36.066640",
           "strategy": "recency_weighted",
-          "n_samples": 109,
-          "auc": 0.7871,
+          "n_samples": 117,
+          "auc": 0.8146,
           "decay_rate": 0.7,
-          "trained_at": "2026-07-19T20:25:26.118331"
+          "trained_at": "2026-07-21T16:53:36.063134"
         }
       ]
     }

@@ -21,6 +21,26 @@ print("Generating REALISTIC data for CollectAI...")
 print("=" * 60)
 
 
+PRODUCT_INTEREST_RATE_RANGE = {
+    # Rate tahunan ilustratif per PRODUCT_TYPE (dipakai restructuring engine
+    # untuk hitung amortisasi/haircut — BUKAN fitur model scoring, lihat
+    # collect-ai-upgrade.md). Perlu di-review tim finance sebelum production.
+    'Motor': (0.18, 0.30),
+    'Elektronik & Furnitur': (0.20, 0.36),
+    'Haji & Umrah': (0.12, 0.20),
+    'Dana Tunai': (0.24, 0.40),
+    'Modal Usaha': (0.15, 0.24),
+}
+
+
+def assign_interest_rate(product_type):
+    """Rate tahunan (decimal) untuk satu kontrak, acak dalam rentang wajar
+    per PRODUCT_TYPE. Independen dari default_prob — rate ditentukan saat
+    origination oleh kebijakan produk, bukan oleh perilaku bayar nasabah."""
+    low, high = PRODUCT_INTEREST_RATE_RANGE.get(product_type, (0.18, 0.30))
+    return round(random.uniform(low, high), 4)
+
+
 def assign_default_probability(income_level, age, occupation):
     """
     Assign hidden default probability based on socioeconomic factors.
@@ -186,6 +206,8 @@ def generate_contract_snapshot(df_cust, customer_true_defaults):
             prev_cycle_encoded = max(0, min(3, CYCLE_ENCODE[cycle] - cycle_direction_seed))
             prev_cycle = CYCLE_DECODE[prev_cycle_encoded]
 
+            product_type = random.choice(['Motor', 'Elektronik & Furnitur', 'Haji & Umrah', 'Dana Tunai', 'Modal Usaha'])
+
             data.append({
                 'CONTRACT_NO': contract_no,
                 'CUST_ID': cust_id,
@@ -193,7 +215,8 @@ def generate_contract_snapshot(df_cust, customer_true_defaults):
                 'PRNC_OTS': prnc,
                 'INTR_OTS': round(prnc * 0.10, 2),
                 'CYCLE': cycle,
-                'PRODUCT_TYPE': random.choice(['Motor', 'Elektronik & Furnitur', 'Haji & Umrah', 'Dana Tunai', 'Modal Usaha']),
+                'PRODUCT_TYPE': product_type,
+                'INTEREST_RATE': assign_interest_rate(product_type),
                 'AMBC': ambc,
                 'PREV_CYCLE': prev_cycle,
                 'LOAN_AMOUNT': loan_amount,

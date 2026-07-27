@@ -19,7 +19,12 @@ from config.settings import (  # noqa: E402
     RETRAIN_DECAY_RATE,
     LABEL_WINDOW_DAYS,
 )
-from src.feature_engineering import compute_contract_features, compute_customer_features, enrich_with_cbs  # noqa: E402
+from src.feature_engineering import (  # noqa: E402
+    compute_contract_features,
+    compute_customer_features,
+    enrich_with_cbs,
+    filter_restructured_for_training,
+)
 from src.cbs_builder import build_cbs  # noqa: E402
 from src.outcome_labeler import build_target_variable  # noqa: E402
 from src.retrain_strategies import strategy_recency_weighted  # noqa: E402
@@ -55,6 +60,7 @@ def run_train_initial_model(reference_date=None):
     )
     cbs_df = build_cbs(customer_features)
     enriched = enrich_with_cbs(contract_features, cbs_df)
+    enriched = filter_restructured_for_training(enriched)
 
     # Fill CBS null untuk training first-working
     for c in FEATURE_COLS:

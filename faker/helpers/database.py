@@ -7,6 +7,13 @@ try:
 except Exception:
     create_engine = None
 
+try:
+    from dotenv import load_dotenv
+    _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    load_dotenv(os.path.join(_REPO_ROOT, ".env"))
+except Exception:
+    pass
+
 
 TABLE_COLUMN_RENAMES = {
     'contract_snapshot': {
@@ -37,7 +44,7 @@ def create_postgres_engine_from_env():
         return None
 
     user = os.getenv('PGUSER', 'postgres')
-    password = os.getenv('PGPASSWORD', '123123')
+    password = os.getenv('PGPASSWORD', '')
     host = os.getenv('PGHOST', 'localhost')
     port = os.getenv('PGPORT', '5432')
     database = os.getenv('PGDATABASE', 'collect_ai')

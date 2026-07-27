@@ -37,10 +37,20 @@ def _grade_from_score(score: float) -> str:
     return "D"
 
 
-def build_cbs(df_customer_features: pd.DataFrame) -> pd.DataFrame:
+def build_cbs(
+    df_customer_features: pd.DataFrame,
+    df_restructure_stats: pd.DataFrame | None = None,
+) -> pd.DataFrame:
     """Apply CBS business rules.
 
     Input: output dari compute_customer_features().
+    ``df_restructure_stats`` (opsional, kolom: cust_id, restructure_count,
+    last_restructure_date): dari _compute_restructure_stats() di update_cbs().
+    DIHITUNG ULANG dari sumber kebenaran (contract_snapshot.closed_via_restructure
+    + restructuring_recommendation_output.response_date) setiap kali CBS
+    rebuild — bukan counter yang di-increment manual, supaya tidak ada risiko
+    double-count/idempotency kalau job dijalankan berkali-kali. Default 0/NULL
+    kalau tidak disediakan (supaya build_cbs() tetap testable tanpa DB).
     Output: DataFrame siap insert ke customer_behavioral_standing.
     """
     df = df_customer_features.copy()
@@ -103,13 +113,52 @@ def build_cbs(df_customer_features: pd.DataFrame) -> pd.DataFrame:
 
     df["update_timestamp"] = datetime.now()
 
+    # ── RESTRUCTURE_COUNT / LAST_RESTRUCTURE_DATE (derived) ──────
+    if df_restructure_stats is not None and not df_restructure_stats.empty:
+        stats = df_restructure_stats.copy()
+        stats.columns = [c.lower() for c in stats.columns]
+        df = df.merge(stats[["cust_id", "restructure_count", "last_restructure_date"]], on="cust_id", how="left")
+    if "restructure_count" not in df.columns:
+        df["restructure_count"] = 0
+    if "last_restructure_date" not in df.columns:
+        df["last_restructure_date"] = pd.NaT
+    df["restructure_count"] = df["restructure_count"].fillna(0).astype(int)
+
     out_cols = [
         "cust_id", "active_contract_count", "total_active_ots",
         "behavioral_grade", "recovery_effort_level",
         "ptp_reliability_index", "collection_sensitivity",
         "b_list_status", "update_timestamp",
+        "restructure_count", "last_restructure_date",
     ]
     return df[out_cols].copy()
+
+
+def _compute_restructure_stats(engine) -> pd.DataFrame:
+    """Derived dari sumber kebenaran (bukan counter manual): restructure_count
+    = jumlah kontrak yang sudah closed_via_restructure per cust_id;
+    last_restructure_date = response_date ACCEPTED terbaru per cust_id.
+    Return DataFrame kosong kalau tabelnya belum ada (mis. schema lama)."""
+    try:
+        counts = pd.read_sql(
+            "SELECT cust_id, COUNT(*) AS restructure_count "
+            "FROM contract_snapshot WHERE closed_via_restructure = TRUE "
+            "GROUP BY cust_id",
+            engine,
+        )
+        dates = pd.read_sql(
+            "SELECT cust_id, MAX(response_date) AS last_restructure_date "
+            "FROM restructuring_recommendation_output "
+            "WHERE offer_status = 'ACCEPTED' AND response_date IS NOT NULL "
+            "GROUP BY cust_id",
+            engine,
+        )
+    except Exception:
+        return pd.DataFrame()
+
+    counts.columns = [c.lower() for c in counts.columns]
+    dates.columns = [c.lower() for c in dates.columns]
+    return counts.merge(dates, on="cust_id", how="outer")
 
 
 def update_cbs(engine, reference_date=None):
@@ -127,7 +176,8 @@ def update_cbs(engine, reference_date=None):
 
     cf = compute_contract_features(df_contract, df_payment, df_lkp, reference_date)
     custf = compute_customer_features(df_contract, df_payment, df_lkp, df_customer, cf)
-    cbs_new = build_cbs(custf)
+    restructure_stats = _compute_restructure_stats(engine)
+    cbs_new = build_cbs(custf, restructure_stats)
 
     # Preserve B_LIST=Y
     try:

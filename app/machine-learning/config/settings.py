@@ -3,12 +3,24 @@
 # Ubah nilai di sini tanpa perlu menyentuh kode bisnis
 
 import os
+from dotenv import load_dotenv
 
 # ── DATABASE ──────────────────────────────────────────────────────
-DB_URL = os.environ.get(
-    "COLLECTAI_DB_URL",
-    "postgresql://postgres:123123@localhost:5432/collect_ai",
-)
+# Kredensial dari .env di root repo (SATU file dipakai bersama oleh
+# app/backend/, app/machine-learning/, app/core-banking/) — TIDAK ADA
+# kredensial hardcode di source code. Lihat .env.example untuk template.
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+load_dotenv(os.path.join(_REPO_ROOT, ".env"))
+
+if os.environ.get("COLLECTAI_DB_URL"):
+    DB_URL = os.environ["COLLECTAI_DB_URL"]
+else:
+    _pg_host = os.environ.get("PGHOST", "localhost")
+    _pg_port = os.environ.get("PGPORT", "5432")
+    _pg_user = os.environ.get("PGUSER", "postgres")
+    _pg_password = os.environ.get("PGPASSWORD", "")
+    _pg_database = os.environ.get("PGDATABASE", "collect_ai")
+    DB_URL = f"postgresql://{_pg_user}:{_pg_password}@{_pg_host}:{_pg_port}/{_pg_database}"
 
 # ── PATH (relatif terhadap folder machine-learning) ───────────────
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -59,6 +71,15 @@ QC_SELF_CURE_MIN_PCT  = 0.03   # diturunkan dari 0.05 — segmen Self-cure
                                 # >= SELF_CURE_PROB_THRESHOLD sekaligus, jadi
                                 # proporsinya wajar lebih kecil dari sebelumnya
 QC_CRITICAL_MAX_PCT  = 0.20
+
+# STRICT_QC=False menurunkan cek distribusi (wont_pay/self_cure/critical %)
+# dari hard-fail jadi soft-warning — dipakai saat dev/testing dengan data
+# sintetis, dimana proporsi segmen wajar goyang run-ke-run karena sampel
+# acak kecil (bukan indikasi model/pipeline rusak). Default TETAP True
+# (hard-fail) supaya perilaku produksi tidak berubah — override eksplisit
+# lewat env var COLLECTAI_STRICT_QC=false, atau parameter
+# run_daily_scoring(strict_qc=False)/run_quality_check(df, strict=False).
+STRICT_QC = os.environ.get("COLLECTAI_STRICT_QC", "true").strip().lower() != "false"
 
 # ── CBS / BEHAVIORAL GRADE ────────────────────────────────────────
 GRADE_A_THRESHOLD = 0.80
@@ -211,3 +232,37 @@ RESULT_CODE_MAP = {
     "Menolak": 0,
 }
 BEHAVIORAL_GRADE_MAP = {"A": 3, "B": 2, "C": 1, "D": 0}
+
+# ── RESTRUCTURING POLICY — starting point, PERLU APPROVAL finance/risk ────
+# Nilai di bawah ini ilustratif (lihat restructuring-engine-tasks.md Catatan
+# #1) — jangan deploy ke production sebelum di-review ulang. Nilai yang
+# sama juga jadi default dataclass RestructurePolicy di
+# app/shared/restructuring_offer_calculator.py; kalau berubah, ubah DI SINI
+# lalu bangun RestructurePolicy lewat restructuring_policy_from_settings()
+# di src/restructuring_offer_calculator.py — jangan hardcode
+# ulang di pipeline manapun.
+MAX_HAIRCUT_PCT              = 0.40   # maks turun 40% relatif dari rate asal
+MIN_RATE_FLOOR                = 0.09   # floor absolut ~cost of fund + margin
+MAX_TENOR_EXTENSION_MONTHS    = 24
+MAX_TENOR_EXTENSION_RATIO     = 0.50   # atau maks 50% dari sisa tenor asli — ambil yg lebih ketat
+
+MIN_DPD_FOR_RESTRUCTURE       = 30
+MAX_DPD_FOR_RESTRUCTURE       = 180
+MAX_RESTRUCTURE_PER_CUSTOMER  = 2      # ke-3+ butuh approval komite manual
+
+ASSET_VALUE_MIN_RATIO         = 0.50   # nilai appraisal min. tutup 50% OTS
+APPRAISAL_MAX_AGE_MONTHS      = 3
+
+CONSOLIDATION_MIN_ACTIVE_CONTRACTS   = 2
+CONSOLIDATION_PROBLEM_CONTRACTS_ONLY = True  # kontrak lancar tidak ikut merge (default)
+
+RESTRUCTURE_DISCOUNT_RATE_ANNUAL = 0.12  # dipakai utk NPV, bukan bunga kontrak
+
+# ── QC THRESHOLD RESTRUCTURING (TASK-54) ──────────────────────────
+RESTRUCTURE_OFFER_EXPIRY_DAYS = 14   # generated_date + N hari -> offer_status EXPIRED
+
+# ── LINEAGE FILTER (TASK-53) ───────────────────────────────────────
+# Kontrak hasil restrukturisasi dikeluarkan dari training set 4 model
+# existing sampai berjalan N bulan pasca-restrukturisasi, supaya DPD yang
+# "reset" administratif tidak disalahartikan sebagai perbaikan perilaku.
+MIN_MONTHS_POST_RESTRUCTURE_FOR_TRAINING = 3

@@ -13,6 +13,7 @@ from config.settings import (
     QC_WONT_PAY_MAX_PCT,
     QC_SELF_CURE_MIN_PCT,
     QC_CRITICAL_MAX_PCT,
+    STRICT_QC,
 )
 
 
@@ -123,7 +124,19 @@ def compute_confidence_level(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def run_quality_check(df_output: pd.DataFrame):
+def run_quality_check(df_output: pd.DataFrame, strict: bool | None = None):
+    """
+    ``strict`` (default None = ambil dari config.settings.STRICT_QC):
+    kalau False, cek DISTRIBUSI (wont_pay/self_cure/critical %) diturunkan
+    jadi soft-warning, bukan hard-fail — dipakai untuk run dev/testing
+    dengan data sintetis dimana proporsi segmen wajar goyang run-ke-run
+    karena sampel acak kecil, bukan indikasi model/pipeline rusak.
+
+    Cek integritas data (range, null, duplikat) TETAP hard di kedua mode —
+    itu bug nyata di kode/data, bukan soal kalibrasi bisnis.
+    """
+    if strict is None:
+        strict = STRICT_QC
     df = df_output.copy()
     checks = []
     is_small_batch = len(df) < 200
@@ -154,7 +167,7 @@ def run_quality_check(df_output: pd.DataFrame):
     self_pct = float((df["risk_segment"] == "Self-cure").sum() / total)
     critical_pct = float((df["priority_level"] == "Critical").sum() / total)
 
-    dist_severity = "soft" if is_small_batch else "hard"
+    dist_severity = "soft" if (is_small_batch or not strict) else "hard"
     checks.append((f"wont_pay_pct<={QC_WONT_PAY_MAX_PCT:.0%}", wont_pct <= QC_WONT_PAY_MAX_PCT, dist_severity))
     checks.append((f"self_cure_pct>={QC_SELF_CURE_MIN_PCT:.0%}", self_pct >= QC_SELF_CURE_MIN_PCT, dist_severity))
     checks.append((f"critical_pct<={QC_CRITICAL_MAX_PCT:.0%}", critical_pct <= QC_CRITICAL_MAX_PCT, dist_severity))
@@ -186,7 +199,7 @@ def run_quality_check(df_output: pd.DataFrame):
             selfcure_rfr = selfcure_rows['roll_forward_risk'].mean()
             checks.append(("wont_pay_rfr>self_cure_rfr", bool(wont_pay_rfr >= selfcure_rfr), "soft"))
 
-    print("\n[QC] Summary")
+    print(f"\n[QC] Summary (strict_qc={strict})")
     hard_failed = []
     for name, passed, severity in checks:
         flag = "PASS" if passed else "FAIL"

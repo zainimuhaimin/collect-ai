@@ -1,10 +1,10 @@
 -- app/machine-learning/config/schema_combined.sql
--- Schema gabungan CollectAI ML (schema.sql v1 + schema_v2.sql upgrade)
+-- Schema gabungan CollectAI ML (schema.sql v1 + schema_v2.sql + schema_v3.sql)
 -- Ditulis sebagai fresh install — semua kolom upgrade sudah menyatu
 -- langsung di CREATE TABLE (bukan ALTER TABLE terpisah).
 --
--- Gunakan file ini untuk instalasi baru. schema.sql dan schema_v2.sql
--- tetap dipertahankan sebagai riwayat migrasi bertahap (v1 -> v2).
+-- Gunakan file ini untuk instalasi baru. schema.sql, schema_v2.sql, dan
+-- schema_v3.sql tetap dipertahankan sebagai riwayat migrasi bertahap (v1 -> v3).
 
 -- ── INPUT TABLES (read-only sumber data) ──────────────────────────
 
@@ -34,7 +34,13 @@ CREATE TABLE IF NOT EXISTS contract_snapshot (
     installment_amount          DECIMAL(18, 2),
     maturity_date                DATE,
     overdue_installment_count   INTEGER         DEFAULT 0,
-    late_fee_amount              DECIMAL(18, 2) DEFAULT 0
+    late_fee_amount              DECIMAL(18, 2) DEFAULT 0,
+    -- ── kolom upgrade (eks schema_v3 — restructuring engine) ──
+    -- interest_rate BUKAN fitur model scoring (lihat collect-ai-upgrade.md),
+    -- murni untuk kalkulasi amortisasi/haircut di restructuring engine.
+    interest_rate               NUMERIC(6, 4),
+    closed_via_restructure      BOOLEAN         DEFAULT FALSE,
+    new_contract_no             VARCHAR(30)
 );
 
 CREATE TABLE IF NOT EXISTS payment_history (
@@ -99,7 +105,10 @@ CREATE TABLE IF NOT EXISTS customer_behavioral_standing (
     ptp_reliability_index     NUMERIC(5,4),
     collection_sensitivity    VARCHAR(20),
     b_list_status             CHAR(1)        NOT NULL DEFAULT 'N',
-    update_timestamp          TIMESTAMP      DEFAULT NOW()
+    update_timestamp          TIMESTAMP      DEFAULT NOW(),
+    -- ── kolom upgrade (eks schema_v3 — restructuring engine) ──
+    restructure_count         INTEGER        DEFAULT 0,
+    last_restructure_date     DATE
 );
 
 -- ── MLOPS TABLE: Scoring Labels ───────────────────────────────────
@@ -165,11 +174,78 @@ CREATE INDEX IF NOT EXISTS idx_payment_self_cure
 CREATE INDEX IF NOT EXISTS idx_payment_recovery_source
   ON payment_history (recovery_source);
 
+-- ══════════════════════════════════════════════════════════════════
+-- RESTRUCTURING RECOMMENDATION ENGINE (eks schema_v3)
+-- ══════════════════════════════════════════════════════════════════
 
--- PGPASSWORD=123123 psql -h localhost -U postgres -d collect_ai -c "
--- TRUNCATE TABLE
---   scoring_feature_snapshot, ai_intelligence_output, customer_behavioral_standing,
---   scoring_labels, shadow_scores, model_monitoring_log,
---   lkp_interaction, payment_history, contract_snapshot, customer_master
--- RESTART IDENTITY;
--- " 2>&1
+-- ── GROUP MAP: 1 tawaran bisa mencakup 1 atau N kontrak ─────────────
+CREATE TABLE IF NOT EXISTS restructuring_group_map (
+    restructure_group_id  VARCHAR(40)  NOT NULL,
+    contract_no           VARCHAR(30)  NOT NULL,
+    cust_id               VARCHAR(30)  NOT NULL,
+    inclusion_reason      VARCHAR(50),
+    PRIMARY KEY (restructure_group_id, contract_no)
+);
+
+-- ── OUTPUT: tawaran yang direkomendasikan ───────────────────────────
+-- eligibility_tier/eligibility_reasons/source/requested_by ditarik maju
+-- dari schema_v4.sql (TASK-59) karena restructuring_runner.py (TASK-52)
+-- butuh menyimpannya sejak batch run pertama.
+CREATE TABLE IF NOT EXISTS restructuring_recommendation_output (
+    restructure_group_id        VARCHAR(40) PRIMARY KEY,
+    cust_id                      VARCHAR(30) NOT NULL,
+    offer_type                   VARCHAR(20) NOT NULL,
+    contract_count_included      INTEGER NOT NULL,
+    total_ots_combined           NUMERIC(18,2),
+    recommended_new_tenor        INTEGER,
+    recommended_new_rate         NUMERIC(6,4),
+    recommended_new_installment  NUMERIC(18,2),
+    recovery_from_asset          NUMERIC(18,2) DEFAULT 0,
+    npv_baseline                 NUMERIC(18,2),
+    npv_restructured             NUMERIC(18,2),
+    offer_status                 VARCHAR(20) DEFAULT 'GENERATED',
+    generated_date                DATE NOT NULL,
+    expiry_date                   DATE,
+    eligibility_tier             VARCHAR(20) DEFAULT 'AUTO',
+    eligibility_reasons          TEXT,
+    source                       VARCHAR(20) DEFAULT 'BATCH',
+    requested_by                 VARCHAR(50),
+    response_date                 DATE,  -- kapan customer benar-benar merespons (accept/reject)
+    CONSTRAINT chk_offer_type   CHECK (offer_type IN ('REFINANCE','CONSOLIDATE','TAKEOVER')),
+    CONSTRAINT chk_offer_status CHECK (offer_status IN ('GENERATED','OFFERED','ACCEPTED','REJECTED','EXPIRED')),
+    CONSTRAINT chk_eligibility_tier CHECK (eligibility_tier IN ('AUTO','MANUAL_REVIEW','BLOCKED')),
+    CONSTRAINT chk_source CHECK (source IN ('BATCH','ON_DEMAND'))
+);
+
+-- ── HISTORY: hasil aktual — bahan training model acceptance Fase 2 ──
+CREATE TABLE IF NOT EXISTS restructuring_history (
+    restructure_group_id      VARCHAR(40) NOT NULL,
+    offered_date               DATE NOT NULL,
+    customer_response          VARCHAR(20),
+    response_date               DATE,
+    post_restructure_dpd_30d   INTEGER,
+    post_restructure_dpd_90d   INTEGER,
+    PRIMARY KEY (restructure_group_id, offered_date)
+);
+
+-- ── PRODUCT CONVERSION MAPPING (placeholder — belum diisi tim produk) ─
+CREATE TABLE IF NOT EXISTS product_conversion_mapping (
+    source_product_type          VARCHAR(50) NOT NULL,
+    allowed_target_product_type  VARCHAR(50) NOT NULL,
+    conversion_type               VARCHAR(30),
+    requires_appraisal            BOOLEAN DEFAULT TRUE,
+    PRIMARY KEY (source_product_type, allowed_target_product_type)
+);
+
+-- ── ASSET APPRAISAL (input eksternal — bukan hasil AI) ────────────────
+CREATE TABLE IF NOT EXISTS asset_appraisal (
+    contract_no       VARCHAR(30) NOT NULL,
+    asset_id          VARCHAR(40) NOT NULL,
+    appraised_value   NUMERIC(18,2) NOT NULL,
+    appraisal_date    DATE NOT NULL,
+    condition_grade   VARCHAR(10),
+    PRIMARY KEY (contract_no, asset_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_restructure_group_cust    ON restructuring_group_map (cust_id);
+CREATE INDEX IF NOT EXISTS idx_restructure_output_status ON restructuring_recommendation_output (offer_status);

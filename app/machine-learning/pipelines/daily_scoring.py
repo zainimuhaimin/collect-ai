@@ -16,6 +16,7 @@ from src.cbs_builder import build_cbs  # noqa: E402
 from src.scoring_engine import score_contracts, compute_confidence_level, run_quality_check  # noqa: E402
 from src.business_rules import apply_risk_segment, apply_nba, apply_priority  # noqa: E402
 from src.model_registry import get_champion_path  # noqa: E402
+from pipelines.restructuring_runner import run_restructuring_assessment  # noqa: E402
 
 
 def _load_table(engine, query: str) -> pd.DataFrame:
@@ -84,7 +85,11 @@ def _append_log(summary: dict):
         row.to_csv(LOG_PATH, mode="w", index=False)
 
 
-def run_daily_scoring(reference_date=None):
+def run_daily_scoring(reference_date=None, strict_qc=None):
+    """``strict_qc``: teruskan False untuk run dev/testing dengan data
+    sintetis (menurunkan cek distribusi QC jadi soft-warning, bukan
+    hard-fail). Default None = ikuti config.settings.STRICT_QC (True untuk
+    produksi)."""
     ref_date = pd.Timestamp(reference_date).date() if reference_date else pd.Timestamp.today().date()
     engine = create_engine(DB_URL)
 
@@ -158,8 +163,17 @@ def run_daily_scoring(reference_date=None):
     df_scored = apply_nba(df_scored, df_cbs)
     df_scored = apply_priority(df_scored)
 
+    # Step 7.5 — Restructuring recommendation (TASK-52). Tidak boleh
+    # menggagalkan publish scoring utama kalau step ini error; sengaja
+    # dijalankan dengan df_scored di memori (belum ada di ai_intelligence_output
+    # sampai Step 8) supaya siklus assessment ikut skor hari ini juga.
+    try:
+        run_restructuring_assessment(reference_date=ref_date, engine=engine, df_scored=df_scored)
+    except Exception as exc:
+        print(f"[Daily Scoring] Restructuring assessment gagal (dilewati): {exc}")
+
     # Step 7
-    qc_result = run_quality_check(df_scored)
+    qc_result = run_quality_check(df_scored, strict=strict_qc)
 
     # Step 8
     df_scored["scoring_date"] = ref_date

@@ -2,6 +2,9 @@
 
 Untuk training awal: build_target_variable() — semua scoring date sama.
 Untuk MLOps weekly: label_historical_scores() — append ke scoring_labels.
+Untuk restructuring (TASK-55): label_restructuring_outcomes() — append ke
+restructuring_history, satu-satunya bahan baku training model acceptance
+probability Fase 2.
 """
 from __future__ import annotations
 
@@ -9,6 +12,7 @@ import pandas as pd
 import numpy as np
 import sys
 import os
+from sqlalchemy import text
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.settings import LABEL_WINDOW_DAYS
@@ -200,3 +204,104 @@ def get_labeled_dataset(engine) -> pd.DataFrame:
 
     print(f"[Labeler] {len(labeled):,} records labeled tersedia untuk MLOps")
     return labeled
+
+
+def label_restructuring_outcomes(engine, reference_date=None) -> pd.DataFrame:
+    """TASK-55 — Capture customer_response + post_restructure_dpd_30d/90d
+    ke restructuring_history untuk tawaran yang statusnya sudah bergerak
+    (ACCEPTED/REJECTED) — offer_status='GENERATED' berarti belum ada
+    respons apapun, belum ada yang perlu dicatat.
+
+    Idempotent: melewati (restructure_group_id, offered_date) yang sudah
+    ada di restructuring_history.
+
+    response_date dipakai untuk menandai kapan customer benar-benar
+    merespons (diisi oleh backend saat endpoint customer-response dipanggil
+    — lihat app/backend/services/restructuring_service.py). Fallback ke
+    generated_date HANYA untuk baris lama yang belum punya response_date
+    terisi (sebelum kolom ini ada).
+
+    Keterbatasan jujur: post_restructure_dpd_30d/90d di sini adalah proxy
+    dari DPD_CURRENT kontrak baru (new_contract_no) SAAT job ini jalan,
+    bukan snapshot historis presisi di hari ke-30/90 — sistem ini hanya
+    punya satu snapshot kontrak per waktu (bukan time series), sama seperti
+    keterbatasan actual_roll_forward di label_historical_scores().
+    """
+    ref_date = pd.Timestamp(reference_date).normalize() if reference_date else pd.Timestamp.today().normalize()
+
+    offers = pd.read_sql(
+        "SELECT restructure_group_id, cust_id, offer_status, generated_date, response_date "
+        "FROM restructuring_recommendation_output "
+        "WHERE offer_status IN ('ACCEPTED', 'REJECTED')",
+        engine,
+    )
+    if offers.empty:
+        print("[Restructuring Labeler] Belum ada offer ACCEPTED/REJECTED untuk dilabeli")
+        return pd.DataFrame()
+
+    offers.columns = [c.lower() for c in offers.columns]
+    offers["offered_date"] = pd.to_datetime(offers["generated_date"])
+    offers["response_date"] = pd.to_datetime(offers["response_date"]).fillna(offers["offered_date"])
+
+    existing = pd.read_sql(
+        "SELECT restructure_group_id, offered_date FROM restructuring_history", engine
+    )
+    if not existing.empty:
+        existing.columns = [c.lower() for c in existing.columns]
+        existing["offered_date"] = pd.to_datetime(existing["offered_date"])
+        existing_keys = set(zip(existing["restructure_group_id"], existing["offered_date"].dt.date))
+        offers = offers[
+            ~offers.apply(lambda r: (r["restructure_group_id"], r["offered_date"].date()) in existing_keys, axis=1)
+        ]
+
+    if offers.empty:
+        print("[Restructuring Labeler] Semua offer ACCEPTED/REJECTED sudah dilabeli sebelumnya")
+        return pd.DataFrame()
+
+    group_map = pd.read_sql(
+        text(
+            "SELECT restructure_group_id, contract_no FROM restructuring_group_map "
+            "WHERE restructure_group_id = ANY(:ids)"
+        ),
+        engine,
+        params={"ids": offers["restructure_group_id"].tolist()},
+    )
+    group_map.columns = [c.lower() for c in group_map.columns]
+
+    contracts = pd.read_sql("SELECT contract_no, new_contract_no, dpd_current FROM contract_snapshot", engine)
+    contracts.columns = [c.lower() for c in contracts.columns]
+    new_contract_lookup = contracts.set_index("contract_no")["new_contract_no"].to_dict()
+    dpd_lookup = contracts.set_index("contract_no")["dpd_current"].to_dict()
+
+    rows = []
+    for _, offer_row in offers.iterrows():
+        group_id = offer_row["restructure_group_id"]
+        customer_response = "ACCEPTED" if offer_row["offer_status"] == "ACCEPTED" else "REJECTED"
+        response_date = offer_row["response_date"]
+
+        post_dpd_30 = None
+        post_dpd_90 = None
+        if customer_response == "ACCEPTED":
+            member_contracts = group_map.loc[group_map["restructure_group_id"] == group_id, "contract_no"]
+            new_contract_nos = [new_contract_lookup.get(c) for c in member_contracts if new_contract_lookup.get(c)]
+            days_elapsed = (ref_date - response_date).days
+            if new_contract_nos:
+                current_dpd = dpd_lookup.get(new_contract_nos[0])
+                if current_dpd is not None and days_elapsed >= 30:
+                    post_dpd_30 = int(current_dpd)
+                if current_dpd is not None and days_elapsed >= 90:
+                    post_dpd_90 = int(current_dpd)
+
+        rows.append({
+            "restructure_group_id": group_id,
+            "offered_date": offer_row["offered_date"].date(),
+            "customer_response": customer_response,
+            "response_date": response_date.date(),
+            "post_restructure_dpd_30d": post_dpd_30,
+            "post_restructure_dpd_90d": post_dpd_90,
+        })
+
+    result = pd.DataFrame(rows)
+    result.to_sql("restructuring_history", engine, if_exists="append", index=False)
+    print(f"[Restructuring Labeler] {len(result):,} baris baru ditambahkan ke restructuring_history")
+    return result
