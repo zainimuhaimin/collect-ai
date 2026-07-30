@@ -1,2 +1,6 @@
 run_at,reference_date,n_scored,wont_pay_pct,self_cure_pct,critical_pct,segment_breakdown,priority_breakdown
 2026-07-21T17:07:29.561556,2026-07-21,721,0.0943,0.018,0.0791,"{'Can Pay': 633, ""Won't Pay"": 68, 'Self-cure': 13, 'Cannot Pay': 7}","{'Medium': 316, 'Low': 181, 'High': 167, 'Critical': 57}"
+2026-07-29T14:33:32.844838,2026-07-29,735,0.0884,0.0517,0.0871,"{'Can Pay': 616, ""Won't Pay"": 65, 'Self-cure': 38, 'Cannot Pay': 16}","{'Medium': 338, 'Low': 198, 'High': 135, 'Critical': 64}"
+2026-07-29T14:52:24.959204,2026-07-29,735,0.0884,0.0517,0.0871,"{'Can Pay': 616, ""Won't Pay"": 65, 'Self-cure': 38, 'Cannot Pay': 16}","{'Medium': 338, 'Low': 198, 'High': 135, 'Critical': 64}"
+2026-07-30T13:01:33.358383,2026-07-30,2817,0.3497,0.1108,0.383,"{'Can Pay': 1104, ""Won't Pay"": 985, 'Cannot Pay': 416, 'Self-cure': 312}","{'Critical': 1079, 'Medium': 779, 'High': 502, 'Low': 457}"
+2026-07-30T13:02:52.770993,2026-07-30,2817,0.3497,0.1108,0.383,"{'Can Pay': 1104, ""Won't Pay"": 985, 'Cannot Pay': 416, 'Self-cure': 312}","{'Critical': 1079, 'Medium': 779, 'High': 502, 'Low': 457}"

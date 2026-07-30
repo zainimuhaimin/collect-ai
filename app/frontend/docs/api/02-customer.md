@@ -1,143 +1,159 @@
-# Customer Detail API
+# Customer API
 
 ## Overview
 
-Powers the 360° debtor view: balance, PTP (Promise-to-Pay) history, AI risk/recovery scoring, and a collection activity timeline.
+Covers three things: the paginated/filterable customer list, the 360° Customer Detail view (balance, CBS behavioral standing, AI risk/recovery scoring, restructuring options), and the lightweight list of a customer's contracts used by Customer Detail's expandable "Kontrak Milik Customer Ini" section.
 
-**Backend status:** of all six modules, this one maps most directly onto tables that already exist in `app/machine-learning/config/schema_combined.sql`:
-- `ai_intelligence_output` → `recoveryScore`, `selfCureProbability`, `ptpSuccessProbability`, risk fields (joined by `cust_id`/`contract_no`).
-- `customer_behavioral_standing` (CBS) → `behavioral_grade`/`recovery_effort_level`/`ptp_reliability_index` roughly map to `recoveryLabel`/`riskTier`/`riskTierLevel` (exact field mapping needs a data-team conversation, but the entities line up).
-- The collection activity timeline (SMS sent, calls, broken promises) would come from `lkp_interaction` and payment records, not from the scoring tables.
+**Backend status:** maps directly onto tables that already exist in `app/machine-learning/config/schema_combined.sql`:
+- `ai_intelligence_output` → `riskSegment`, `recoveryScore`, `selfCureProbability`, `rollForwardRisk`, `ptpSuccessProbability`, `nbaRecommendation` (joined by `cust_id`, taking the customer's primary/highest-DPD contract — see the note under Customer Detail below).
+- `customer_behavioral_standing` (CBS) → `behavioralGrade`, `bListStatus`, `restructureCount`, `activeContractCount`.
+- `contract_snapshot` → `dpdDays`/`outstanding` roll-ups for the list, and the per-contract fields in `GET /customers/:custId/contracts`.
+- `lkp_interaction` → the `broken_ptp` filter (latest `ptp_status = 'BROKEN'` per contract).
 
-This makes Customer Detail the recommended **first real endpoint to build** once backend work starts.
+This corrects the old `customerDetailSchema`, which had an invented `riskTier: "HIGH RISK" | "MEDIUM RISK" | "LOW RISK"` enum with no real backend source. The real `risk_segment` column's values (`Cannot Pay` / `Self Cure` / `Won't Pay`) are used as-is everywhere now — see `src/domains/shared/riskSegment.ts`.
 
-**Consumed by:** `src/pages/CustomerDetailPage.tsx`
+**Consumed by:** `src/pages/CustomerListPage.tsx`, `src/pages/CustomerDetailPage.tsx`
 
 **Frontend files:**
 - Schema: `src/domains/customer/customer.schema.ts`
 - API calls: `src/domains/customer/customer.api.ts`
-- Hooks: `src/domains/customer/useCustomerDetailQuery.ts`, `src/domains/customer/useCustomerTimelineQuery.ts`
+- Hooks: `src/domains/customer/useCustomerDetailQuery.ts`, `src/domains/customer/useCustomerListQuery.ts`, `src/domains/customer/useCustomerContractsQuery.ts`
 - Mock: `src/mocks/fixtures/customer.fixtures.ts`, `src/mocks/handlers/customer.handlers.ts`
+
+Customer Detail also renders the "Opsi Restrukturisasi" card and the per-contract activity log — see [`08-restructuring.md`](./08-restructuring.md) and [`07-contract.md`](./07-contract.md) respectively; those are separate endpoints/domains consumed by the same page.
 
 ---
 
-## `GET /customer/:customerId`
+## `GET /customers`
 
-Returns the full profile card + summary metrics + AI scoring for one customer.
+Paginated, filterable, searchable customer list.
 
 **Auth required:** Yes.
 
-**Path params**
+**Query params**
 
 | Param | Type | Notes |
 |---|---|---|
-| `customerId` | string | Comes straight from the URL, e.g. `/customers/C-90218341` in the app → `customerId = "C-90218341"`. This is presumably `cust_id` in the DB, but confirm the exact ID format/prefix convention with the data team. |
+| `filter` | `all` \| `dpd_30_plus` \| `high_amount` \| `broken_ptp` \| `high_ambc` | See table below. |
+| `search` | string | Case-insensitive substring match against customer name or `custId`. Empty string = no search filtering. |
+| `page` | number | 1-indexed. |
+| `pageSize` | number | Rows per page (the frontend currently always sends `10`). |
+
+**Filter semantics** — note `broken_ptp`/`high_ambc` are really per-*contract* attributes; at the customer level they mean "this customer has ≥1 contract matching":
+
+| Filter | Condition |
+|---|---|
+| `all` | No filter. |
+| `dpd_30_plus` | `dpdDays >= 30` (customer's max DPD across contracts). |
+| `high_amount` | `priority` is `High` or `Critical`. |
+| `broken_ptp` | Customer has ≥1 contract whose latest `lkp_interaction.ptp_status = 'BROKEN'`. |
+| `high_ambc` | Customer has ≥1 contract whose `contract_snapshot.ambc` is above the "high" threshold (mock uses `>= 10,000,000`; backend should confirm the real threshold, ideally shared with `07-contract.md`'s `high_ambc` filter). |
 
 **Success response — `200`**
 
 ```json
 {
-  "id": "C-90218341",
-  "name": "Budi Pratama Sitorus",
-  "initials": "BP",
-  "verified": true,
-  "outstandingBalance": "Rp 12.450.000",
-  "balanceChange": "-12% since last month",
-  "ptpHistory": { "success": 4, "broken": 2, "rate": "66%" },
-  "ptpMonths": [
-    { "month": "May", "result": "success" },
-    { "month": "Jun", "result": "success" },
-    { "month": "Jul", "result": "broken" },
-    { "month": "Aug", "result": "success" },
-    { "month": "Sep", "result": "success" },
-    { "month": "Oct", "result": "broken" }
+  "customers": [
+    { "custId": "CUST-00001", "name": "Budi Pratama Sitorus", "dpdDays": 62, "amount": "Rp 18.190.000", "priority": "Critical" }
   ],
-  "riskTier": "HIGH RISK",
-  "riskTierLevel": "Tier 3",
-  "riskScore": 82,
-  "recoveryScore": 74,
-  "recoveryLabel": "Moderate Recovery",
-  "selfCureProbability": "12.5%",
-  "ptpSuccessProbability": "68.2%",
-  "targetNbaAction": "Personalized SMS Hook",
-  "aiJustification": "Nasabah menunjukkan pola pembayaran yang reaktif terhadap pengingat digital pada akhir pekan..."
+  "pageInfo": { "showingFrom": 1, "showingTo": 10, "totalCustomers": 18, "totalPages": 2 }
 }
 ```
 
 | Field | Type | Notes |
 |---|---|---|
-| `id` | string | Echo of the requested `customerId`. |
+| `customers[].custId` | string | Primary identifier, used to build `/customers/:custId` links. |
+| `customers[].name` | string | Full name. |
+| `customers[].dpdDays` | number | Max DPD across the customer's active contracts. |
+| `customers[].amount` | string | **Pre-formatted** total outstanding across all contracts, e.g. `"Rp 18.190.000"`. |
+| `customers[].priority` | `"Medium" \| "High" \| "Critical"` | Drives the priority chip. Not a raw DB column today — backend should define the derivation (likely a function of DPD + outstanding amount + risk_segment) when implementing for real. |
+| `pageInfo.showingFrom` / `.showingTo` | number | 1-indexed inclusive row range for the current page (`0`/`0` when the result set is empty). |
+| `pageInfo.totalCustomers` | number | Total rows matching `filter`+`search`, before pagination. |
+| `pageInfo.totalPages` | number | `ceil(totalCustomers / pageSize)`, minimum `1`. |
+
+---
+
+## `GET /customers/:custId`
+
+Returns the 360° profile: balance, risk/recovery AI scoring, and CBS behavioral standing.
+
+**Auth required:** Yes.
+
+**Success response — `200`**
+
+```json
+{
+  "custId": "CUST-00001",
+  "name": "Budi Pratama Sitorus",
+  "initials": "BP",
+  "outstandingBalance": "Rp 18.190.000",
+  "riskSegment": "Cannot Pay",
+  "riskScore": 59,
+  "recoveryScore": 41,
+  "selfCureProbability": 11,
+  "rollForwardRisk": 68,
+  "ptpSuccessProbability": 24,
+  "nbaRecommendation": "Field Visit",
+  "behavioralGrade": "D",
+  "bListStatus": "Y",
+  "restructureCount": 0,
+  "activeContractCount": 2
+}
+```
+
+| Field | Type | Notes |
+|---|---|---|
+| `custId` | string | Echo of the requested path param. |
 | `name` | string | Full name. |
 | `initials` | string | For the avatar circle. |
-| `verified` | boolean | Shows a "Verified Account" badge when `true`. |
-| `outstandingBalance` | string | **Pre-formatted** as Indonesian Rupiah, e.g. `"Rp 12.450.000"` — the frontend does not format numbers, it displays this string verbatim. |
-| `balanceChange` | string | Pre-formatted trend label, e.g. `"-12% since last month"`. |
-| `ptpHistory.success` | number | Count of kept promises-to-pay (last 12 months). |
-| `ptpHistory.broken` | number | Count of broken promises. |
-| `ptpHistory.rate` | string | Pre-formatted success rate, e.g. `"66%"`. |
-| `ptpMonths` | array of 6–12 items | Powers the small bar sparkline. Each item: `{ month: string, result: "success" \| "broken" }`. Send however many months you have; the UI just renders one bar per entry. |
-| `riskTier` | `"HIGH RISK" \| "MEDIUM RISK" \| "LOW RISK"` | **Exact string values matter** — the frontend switches styling on these literals. |
-| `riskTierLevel` | string | Free-text sub-label next to the tier, e.g. `"Tier 3"`. |
-| `riskScore` | number | 0–100, drives a progress bar. |
-| `recoveryScore` | number | 0–100 (shown in a circular badge). |
-| `recoveryLabel` | string | Free-text label next to the score, e.g. `"Moderate Recovery"`. |
-| `selfCureProbability` | string | **Pre-formatted percentage string**, e.g. `"12.5%"` — not a raw number. The frontend parses the leading number out of this string for a progress bar, so keep the `"<number>%"` shape. |
-| `ptpSuccessProbability` | string | Same format as above. |
-| `targetNbaAction` | string | The AI's recommended "Next Best Action", shown as a button label, e.g. `"Personalized SMS Hook"`. |
-| `aiJustification` | string | Free-text paragraph explaining the AI's reasoning — rendered in a highlighted banner. Can be long; no length limit enforced client-side. |
+| `outstandingBalance` | string | **Pre-formatted** total across all active contracts. |
+| `riskSegment` | `"Cannot Pay" \| "Self Cure" \| "Won't Pay"` | From `ai_intelligence_output.risk_segment`, **displayed as-is** — do not translate to invented strings. See "Which contract's scoring?" below. |
+| `riskScore` | number, 0-100 | Drives a progress bar. Not a literal DB column — mock derives it as `100 - recoveryScore`; backend should define a real derivation (or drop it if product decides `recoveryScore` alone is enough). |
+| `recoveryScore` | number, 0-100 | From `ai_intelligence_output.recovery_score`. **Scale note:** the DB column is `NUMERIC(5,4)` (0-1 decimal). The frontend expects an already-0-100-scaled number — multiply by 100 before sending. |
+| `selfCureProbability` | number, 0-100 | Same scale note as `recoveryScore`. From `ai_intelligence_output.self_cure_probability`. |
+| `rollForwardRisk` | number, 0-100 | Same scale note. From `ai_intelligence_output.roll_forward_risk`. |
+| `ptpSuccessProbability` | number, 0-100 | Same scale note. From `ai_intelligence_output.ptp_success_probability`. |
+| `nbaRecommendation` | string | From `ai_intelligence_output.nba_recommendation`. |
+| `behavioralGrade` | string (single char) | From `customer_behavioral_standing.behavioral_grade`. |
+| `bListStatus` | `"Y" \| "N"` | From `customer_behavioral_standing.b_list_status`. |
+| `restructureCount` | number | From `customer_behavioral_standing.restructure_count`. |
+| `activeContractCount` | number | From `customer_behavioral_standing.active_contract_count`. |
+
+**Which contract's scoring?** `ai_intelligence_output` is keyed by `contract_no`, not `cust_id` — a customer can have several contracts, each independently scored. This mock takes the customer's **highest-DPD contract** as the "primary" one for `riskSegment`/`recoveryScore`/etc. The real backend needs a data-team decision here: highest DPD, highest outstanding, or a proper customer-level aggregate score. Flag this before implementing.
+
+**Field naming / casing:** the frontend's Zod schema is camelCase by convention; the real backend's tables are snake_case. `src/domains/customer/customer.api.ts` runs the raw response through `snakeToCamelDeep` (`src/api/caseTransform.ts`) before validating against the schema, so the backend is free to send snake_case keys (`recovery_score`, `risk_segment`, ...) — no frontend schema changes needed either way.
 
 **Error responses**
 
 | Status | When | Frontend behavior |
 |---|---|---|
-| `404` | Unknown `customerId` | Currently surfaces as a generic error (see root README conventions) — a dedicated "customer not found" UI state would be a good follow-up once this is a real endpoint. |
+| `404` | Unknown `custId` | Generic error today — a dedicated "customer not found" state would be a good follow-up. |
 | `401` | Expired/missing token | Logs the user out. |
 
 ---
 
-## `GET /customer/:customerId/timeline`
+## `GET /customers/:custId/contracts`
 
-Returns the collection activity timeline (chronological log of contact attempts, promises, and system actions) for one customer.
+Lightweight list of a customer's contracts, powering the expandable "Kontrak Milik Customer Ini" section on Customer Detail.
 
 **Auth required:** Yes.
 
-**Path params:** same `customerId` as above.
-
 **Success response — `200`**
-
-An array, newest-first (the frontend does not sort it — send it in display order):
 
 ```json
 [
-  {
-    "id": "tl-1",
-    "icon": "sms",
-    "title": "Automated SMS Sent",
-    "timestamp": "12 Oct 2023, 10:45 AM",
-    "description": "\"Halo Budi, mohon segera melakukan pelunasan tagihan Anda...\"",
-    "tone": "default",
-    "meta": { "label": "Status", "value": "Delivered", "tone": "success" }
-  },
-  {
-    "id": "tl-3",
-    "icon": "event_busy",
-    "title": "Broken Promise (PTP)",
-    "timestamp": "05 Oct 2023, 11:59 PM",
-    "description": "Janji bayar sebesar Rp 1.500.000 tidak terdeteksi di sistem pada tanggal jatuh tempo yang dijanjikan.",
-    "tone": "danger"
-  }
+  { "contractNo": "CTR-00001-1", "productType": "Personal Loan", "dpdCurrent": 62, "outstanding": "Rp 12.450.000", "riskSegment": "Cannot Pay" },
+  { "contractNo": "CTR-00001-2", "productType": "Multiguna", "dpdCurrent": 12, "outstanding": "Rp 5.740.000", "riskSegment": "Self Cure" }
 ]
 ```
 
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `id` | string | yes | Unique per entry, used as the React list key. |
-| `icon` | string | yes | A [Material Symbols](https://fonts.google.com/icons) icon name (e.g. `sms`, `call`, `event_busy`, `person_add`). Pick whatever best represents the event type — the frontend just passes this string straight to the icon font. |
-| `title` | string | yes | Bold headline for the entry, e.g. `"Inbound Call Received"`. |
-| `timestamp` | string | yes | **Pre-formatted display string**, not an ISO date — e.g. `"10 Oct 2023, 02:15 PM"`. The frontend does not parse or reformat it. |
-| `description` | string | yes | Body text. Can contain quoted message text, agent names, etc. — free text, rendered as-is. Often written in Bahasa Indonesia in the current mock; keep the language your ops team actually uses here. |
-| `tone` | `"default" \| "danger"` | yes | `"danger"` renders the entry in red (used for broken promises / failures). |
-| `meta` | object | no | Optional small highlighted callout at the end of the description, e.g. a delivery status. Shape: `{ label: string, value: string, tone: "success" \| "danger" }`. Omit the whole field if there's nothing to highlight. |
+| Field | Type | Notes |
+|---|---|---|
+| `contractNo` | string | Links to `/contracts/:contractNo` (full detail — see `07-contract.md`) and is the key used to lazy-fetch that contract's activity log on first expand. |
+| `productType` | string | e.g. `"Personal Loan"`, `"KPR"`, `"Multiguna"`, `"Kartu Kredit"`. |
+| `dpdCurrent` | number | From `contract_snapshot.dpd_current`. |
+| `outstanding` | string | **Pre-formatted**, `prnc_ots + intr_ots`. |
+| `riskSegment` | `"Cannot Pay" \| "Self Cure" \| "Won't Pay"` | This specific contract's segment (not the customer-level rollup above) — displayed as-is in a chip. |
 
 **Notes**
-- There's a "Load Full History" button in the UI that is currently **not wired to anything** (no pagination/params implemented yet). If your timeline can be long, decide on a pagination or `?before=<timestamp>` cursor param before that button gets wired up — flag this to whoever picks up that work.
+- On first expand of a row, the frontend separately calls `GET /contracts/:contractNo/activity-log` (documented in `07-contract.md`) — that response is cached per `contractNo` and shared with Contract Detail's own timeline section.

@@ -4,11 +4,15 @@ export interface NavItem {
   readonly path: string;
 }
 
+// 5-menu scope per frontend-layout-upgrade-tasks.md TASK-A. Performance and
+// Collector Workbench were dropped entirely (no backend was ever built for
+// either). Restructuring Approval & AI Intelligence are shown to every
+// logged-in user for now — RBAC was explicitly deferred, not implemented.
 export const navItems: NavItem[] = [
   { label: 'Dashboard', icon: 'grid_view', path: '/dashboard' },
-  { label: 'Performance', icon: 'monitoring', path: '/performance' },
-  { label: 'Collector Workbench', icon: 'work', path: '/workbench' },
-  { label: 'Customer Detail', icon: 'people', path: '/customers/C-90218341' },
+  { label: 'Customer', icon: 'people', path: '/customers' },
+  { label: 'Contract', icon: 'description', path: '/contracts' },
+  { label: 'Restructuring Approval', icon: 'fact_check', path: '/restructuring-approval' },
   { label: 'AI Intelligence', icon: 'psychology', path: '/ai-intelligence' },
 ];
 

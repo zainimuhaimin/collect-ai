@@ -40,6 +40,7 @@ from shared.restructuring_offer_calculator import (  # noqa: E402,F401
     RestructureOffer,
     RestructurePolicy,
     RestructuringAssessment,
+    amortizable_principal,
     apply_guardrail,
     assess_restructuring_options,
     calculate_consolidation_offer,
@@ -47,7 +48,9 @@ from shared.restructuring_offer_calculator import (  # noqa: E402,F401
     calculate_refinance_offer,
     calculate_takeover_offer,
     classify_eligibility,
+    effective_remaining_tenor,
     npv_of_installments,
+    restructured_recovery_probability,
 )
 
 from config.settings import (  # noqa: E402
@@ -62,6 +65,10 @@ from config.settings import (  # noqa: E402
     APPRAISAL_MAX_AGE_MONTHS,
     CONSOLIDATION_MIN_ACTIVE_CONTRACTS,
     RESTRUCTURE_DISCOUNT_RATE_ANNUAL,
+    MIN_INSTALLMENT_REDUCTION_PCT,
+    MAX_TOTAL_REPAYMENT_RATIO,
+    RESTRUCTURE_RECOVERY_UPLIFT_PCT,
+    MAX_RESTRUCTURED_RECOVERY,
 )
 
 
@@ -82,4 +89,8 @@ def restructuring_policy_from_settings() -> RestructurePolicy:
         appraisal_max_age_months=APPRAISAL_MAX_AGE_MONTHS,
         consolidation_min_active_contracts=CONSOLIDATION_MIN_ACTIVE_CONTRACTS,
         discount_rate_annual=RESTRUCTURE_DISCOUNT_RATE_ANNUAL,
+        min_installment_reduction_pct=MIN_INSTALLMENT_REDUCTION_PCT,
+        max_total_repayment_ratio=MAX_TOTAL_REPAYMENT_RATIO,
+        restructure_recovery_uplift_pct=RESTRUCTURE_RECOVERY_UPLIFT_PCT,
+        max_restructured_recovery=MAX_RESTRUCTURED_RECOVERY,
     )

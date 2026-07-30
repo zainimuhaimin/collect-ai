@@ -44,6 +44,11 @@ def get_restructuring_options(
     if assessment is None:
         raise HTTPException(status_code=404, detail=f"Data kontrak untuk {cust_id} tidak ditemukan")
 
+    offer_ref = service.get_active_offer_reference(cust_id)
+    customer_response = (
+        offer_ref.offer_status if offer_ref and offer_ref.offer_status in ("ACCEPTED", "REJECTED") else None
+    )
+
     return RestructuringAssessmentSchema(
         cust_id=assessment.cust_id,
         contract_no=assessment.contract_no,
@@ -59,10 +64,16 @@ def get_restructuring_options(
                 recovery_from_asset=o.recovery_from_asset,
                 npv_baseline=o.npv_baseline,
                 npv_restructured=o.npv_restructured,
+                npv_restructured_risk_adjusted=o.npv_restructured_risk_adjusted,
+                total_remaining_current=o.total_remaining_current,
+                total_new_schedule=o.total_new_schedule,
                 is_guardrail_passed=o.is_guardrail_passed,
             )
             for o in assessment.offers
         ],
+        restructure_group_id=offer_ref.restructure_group_id if offer_ref else None,
+        can_respond=bool(offer_ref and offer_ref.offer_status == "OFFERED"),
+        customer_response=customer_response,
         source="ON_DEMAND",
     )
 

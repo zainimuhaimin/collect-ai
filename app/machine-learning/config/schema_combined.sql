@@ -1,15 +1,18 @@
 -- app/machine-learning/config/schema_combined.sql
--- Schema gabungan CollectAI ML (schema.sql v1 + schema_v2.sql + schema_v3.sql)
+-- Schema gabungan CollectAI ML (schema.sql v1 + schema_v2.sql + schema_v3.sql
+-- + schema_v4.sql)
 -- Ditulis sebagai fresh install — semua kolom upgrade sudah menyatu
 -- langsung di CREATE TABLE (bukan ALTER TABLE terpisah).
 --
--- Gunakan file ini untuk instalasi baru. schema.sql, schema_v2.sql, dan
--- schema_v3.sql tetap dipertahankan sebagai riwayat migrasi bertahap (v1 -> v3).
+-- Gunakan file ini untuk instalasi baru. schema.sql, schema_v2.sql,
+-- schema_v3.sql, dan schema_v4.sql tetap dipertahankan sebagai riwayat
+-- migrasi bertahap (v1 -> v4).
 
 -- ── INPUT TABLES (read-only sumber data) ──────────────────────────
 
 CREATE TABLE IF NOT EXISTS customer_master (
     cust_id             VARCHAR(30)  PRIMARY KEY,
+    cust_name           VARCHAR(150),
     cust_age            INT,
     cust_occupation     VARCHAR(100),
     cust_income_level   VARCHAR(50),
@@ -40,7 +43,9 @@ CREATE TABLE IF NOT EXISTS contract_snapshot (
     -- murni untuk kalkulasi amortisasi/haircut di restructuring engine.
     interest_rate               NUMERIC(6, 4),
     closed_via_restructure      BOOLEAN         DEFAULT FALSE,
-    new_contract_no             VARCHAR(30)
+    new_contract_no             VARCHAR(30),
+    -- ── kolom upgrade (eks schema_v4) ──
+    status                      VARCHAR(20)     DEFAULT 'aktif'
 );
 
 CREATE TABLE IF NOT EXISTS payment_history (

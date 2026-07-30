@@ -2,9 +2,11 @@
 
 ## Overview
 
-The consolidated portfolio dashboard: 4 KPI tiles, a DPD-bucket-vs-PTP-status chart, a contactability funnel, and a table of high-priority broken-PTP accounts.
+The consolidated portfolio dashboard: 4 KPI tiles, a DPD-bucket-vs-PTP-status chart, a contactability funnel, a restructuring pipeline snapshot, and a risk segment distribution.
 
-**Backend status:** no dedicated dashboard table exists, but every field here is a portfolio-level rollup over the same tables Customer Detail uses (`ai_intelligence_output`, `customer_behavioral_standing`, plus `lkp_interaction` for the contact funnel). Recommended as the **second real endpoint to build**, after Customer Detail, since the aggregation logic can reuse whatever Customer Detail's backend work establishes.
+**Backend status:** no dedicated dashboard table exists, but every field here is a portfolio-level rollup over the same tables Customer/Contract use (`ai_intelligence_output`, `customer_behavioral_standing`, `restructuring_recommendation_output`, plus `lkp_interaction` for the contact funnel). Recommended as the **second real endpoint to build**, after Customer, since the aggregation logic can reuse whatever Customer's backend work establishes.
+
+**Changed per `frontend-layout-upgrade-tasks.md` TASK-B:** the old `brokenPtpPriorities` table ("Broken PTP - High AMBC Priorities") was **removed** from this endpoint's payload entirely — that data moved to the `broken_ptp`/`high_ambc` filters on the Customer and Contract list pages (see `02-customer.md` and `07-contract.md`). Its slot on the dashboard was replaced by two new cards: **Restructuring Pipeline Snapshot** (count of restructuring offers per `offer_status`) and **Risk Segment Distribution** (portfolio-wide count per `risk_segment`).
 
 Everything below is returned by **one single endpoint** — the frontend fetches the whole dashboard in one round trip rather than one request per widget.
 
@@ -41,17 +43,17 @@ Everything below is returned by **one single endpoint** — the frontend fetches
     { "label": "Contacted (65k)", "value": "65k", "percentage": "65%" }
   ],
   "channelEfficiency": { "channel": "WhatsApp", "rate": "82%" },
-  "brokenPtpPriorities": [
-    {
-      "customerId": "#CA-88901",
-      "name": "Andi Saputra",
-      "initials": "AS",
-      "amount": "Rp 12.500.000",
-      "ambcValue": "0.94",
-      "ambcTier": "High",
-      "lastAction": "Broken Promise",
-      "lastActionDate": "Oct 24, 2023"
-    }
+  "restructuringPipelineSnapshot": [
+    { "status": "GENERATED", "count": 842 },
+    { "status": "OFFERED", "count": 513 },
+    { "status": "ACCEPTED", "count": 268 },
+    { "status": "REJECTED", "count": 97 },
+    { "status": "EXPIRED", "count": 41 }
+  ],
+  "riskSegmentDistribution": [
+    { "segment": "Cannot Pay", "count": 3184 },
+    { "segment": "Self Cure", "count": 6920 },
+    { "segment": "Won't Pay", "count": 2378 }
   ],
   "syncNote": "Data last synchronized: 2 minutes ago"
 }
@@ -90,18 +92,19 @@ Everything below is returned by **one single endpoint** — the frontend fetches
 | `channel` | string | Name of the best-performing contact channel, e.g. `"WhatsApp"`. |
 | `rate` | string | Pre-formatted efficiency rate, e.g. `"82%"`. |
 
-### `brokenPtpPriorities` — array (table rows, priority order)
+### `restructuringPipelineSnapshot` — array (one bar per offer status)
 
 | Field | Type | Notes |
 |---|---|---|
-| `customerId` | string | Display ID shown in the table, e.g. `"#CA-88901"`. **Note:** this is a *different ID format* than Customer Detail's `customerId` path param (`C-90218341`) — the frontend currently does a naive `#CA- → C-` string replace to link a dashboard row to `/customers/:id`, which is fragile. Recommend aligning on one ID format between this module and Customer Detail so that hack can be removed. |
-| `name` | string | Debtor name. |
-| `initials` | string | Avatar initials. |
-| `amount` | string | Pre-formatted Rupiah amount. |
-| `ambcValue` | string | AMBC (AI-based prioritization) score, pre-formatted as a decimal string e.g. `"0.94"`. |
-| `ambcTier` | `"High" \| "Medium" \| "Low"` | Drives the colored chip. |
-| `lastAction` | string | e.g. `"Broken Promise"`, `"WA Unread > 48h"`. |
-| `lastActionDate` | string | Pre-formatted date, e.g. `"Oct 24, 2023"`. |
+| `status` | `"GENERATED" \| "OFFERED" \| "ACCEPTED" \| "REJECTED" \| "EXPIRED"` | Matches `restructuring_recommendation_output.offer_status`'s check constraint exactly — send all 5, even if a status currently has 0 rows (the frontend renders whatever array it gets, in order). |
+| `count` | number | Count of restructuring groups currently in that status, portfolio-wide. |
+
+### `riskSegmentDistribution` — array (one bar per risk segment)
+
+| Field | Type | Notes |
+|---|---|---|
+| `segment` | `"Cannot Pay" \| "Self Cure" \| "Won't Pay"` | From `ai_intelligence_output.risk_segment` (or `customer_behavioral_standing`, whichever the backend treats as canonical — same segment values Customer/Contract use elsewhere), **displayed as-is**. |
+| `count` | number | Count of contracts (or customers — pick one and document it) currently in that segment. |
 
 ### `syncNote`
 
@@ -110,5 +113,5 @@ Everything below is returned by **one single endpoint** — the frontend fetches
 | `syncNote` | string | Freeform footer text, e.g. `"Data last synchronized: 2 minutes ago"`. Compute this server-side (e.g. from the scoring pipeline's last run timestamp) rather than hardcoding. |
 
 **Notes**
-- There is no server-side pagination or filtering on this endpoint today — the whole payload is fetched at once on every dashboard visit. If `brokenPtpPriorities` can grow large in production, consider adding a `limit`/`cursor` param before that becomes a problem (React Query will cache the response for 30s regardless, so this isn't urgent).
+- There is no server-side pagination or filtering on this endpoint today — the whole payload is fetched at once on every dashboard visit (it's now just a handful of small arrays, so this should stay comfortably cheap).
 - "Export Report" and "Share Insight" buttons in the UI are **not wired to any endpoint yet** — decide with product what those should do (download a file? open a share dialog?) before building them.

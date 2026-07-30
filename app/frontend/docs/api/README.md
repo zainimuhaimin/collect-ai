@@ -6,16 +6,17 @@ This folder documents every HTTP endpoint the CollectAI frontend (`app/frontend`
 
 ## Modules
 
-Read them in this order — it roughly matches build priority (clearest backend contract first, most-invented-from-scratch last):
+Read them in this order — it roughly matches build priority (clearest backend contract first, most-invented-from-scratch last). Per `frontend-layout-upgrade-tasks.md`, Performance and Collector Workbench (formerly modules 5-6 here) were dropped entirely — no backend was ever built for either, and their UI patterns (filter chips, pagination, activity log) were folded into Customer/Contract instead.
 
 | # | Module | File | Backend status |
 |---|---|---|---|
 | 1 | Auth | [`01-auth.md`](./01-auth.md) | New — needs a real identity/session system |
-| 2 | Customer Detail | [`02-customer.md`](./02-customer.md) | **Maps closely to existing tables** (`ai_intelligence_output`, `customer_behavioral_standing`) |
-| 3 | Dashboard | [`03-dashboard.md`](./03-dashboard.md) | Computable as rollups over the same tables as Customer Detail |
-| 4 | AI Intelligence (governance) | [`04-ai-intelligence.md`](./04-ai-intelligence.md) | **No backing table today** — despite the name, this is model-governance config, not the scoring pipeline itself |
-| 5 | Performance | [`05-performance.md`](./05-performance.md) | **No backing table today** — no Collector/Agent entity exists yet |
-| 6 | Collector Workbench | [`06-workbench.md`](./06-workbench.md) | **No backing table today** — riskiest/most novel contract |
+| 2 | Customer | [`02-customer.md`](./02-customer.md) | **Maps closely to existing tables** (`ai_intelligence_output`, `customer_behavioral_standing`) |
+| 3 | Dashboard | [`03-dashboard.md`](./03-dashboard.md) | Computable as rollups over the same tables as Customer/Contract |
+| 4 | AI Intelligence (governance) | [`04-ai-intelligence.md`](./04-ai-intelligence.md) | **No backing table today** — Phase 1 (Bobot CBS) only; needs a new `model_governance_config` table |
+| 5 | Contract | [`07-contract.md`](./07-contract.md) | **Maps closely to existing tables** (`contract_snapshot`, `payment_history`, `ai_intelligence_output`, `lkp_interaction`) |
+| 6 | Restructuring (customer-facing) | [`08-restructuring.md`](./08-restructuring.md) | **Mostly exists** — mirrors `app/backend/schemas/restructuring.py` / `restructuring_recommendation_output` |
+| 7 | Restructuring Approval | [`09-restructuring-approval.md`](./09-restructuring-approval.md) | New — approve/reject queue + audit log over `restructuring_recommendation_output` |
 
 ## Conventions used across every module
 

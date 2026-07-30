@@ -2,7 +2,8 @@ export interface TimelineItem {
   readonly id: string;
   readonly icon?: string;
   readonly title: string;
-  readonly timestamp: string;
+  // Nullable — backend emits null when the underlying action_date is null.
+  readonly timestamp: string | null;
   readonly description?: string;
   readonly tone: 'default' | 'danger' | 'muted';
   readonly meta?: { label: string; value: string; tone: 'success' | 'danger' };
@@ -33,7 +34,7 @@ export default function ActivityTimeline({ items }: ActivityTimelineProps) {
               {item.title}
             </p>
             <span className="text-label-sm text-on-surface-variant dark:text-surface-variant whitespace-nowrap">
-              {item.timestamp}
+              {item.timestamp ?? '—'}
             </span>
           </div>
           {item.description ? (

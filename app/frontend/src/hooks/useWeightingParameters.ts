@@ -8,7 +8,7 @@ export function useWeightingParameters() {
   const saveMutation = useSaveWeightingParametersMutation();
   const [draft, setDraft] = useState<WeightParameter[] | null>(null);
 
-  const parameters = draft ?? configQuery.data?.weightingParameters ?? [];
+  const parameters = draft ?? configQuery.data?.cbsWeights ?? [];
   const isDirty = draft !== null;
 
   const updateWeight = (label: string, weight: number) => {

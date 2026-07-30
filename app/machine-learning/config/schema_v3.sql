@@ -2,6 +2,12 @@
 -- Restructuring Recommendation Engine — jalankan SETELAH schema_v2
 -- (lihat restructuring-engine-tasks.md TASK-48)
 
+-- ── CUSTOMER_MASTER: nama asli nasabah (frontend-refinement-round2-tasks.md
+-- TASK-6) — sebelumnya tidak ada kolom nama sama sekali, frontend/backend
+-- terpaksa echo cust_id sebagai display name. ────────────────────────
+ALTER TABLE customer_master
+  ADD COLUMN IF NOT EXISTS cust_name VARCHAR(150);
+
 -- ── CONTRACT_SNAPSHOT: raw rate + lineage restrukturisasi ──────────
 -- interest_rate: BUKAN fitur model scoring (lihat collect-ai-upgrade.md —
 -- ditolak sebagai predictor). Field ini murni untuk kalkulasi amortisasi/

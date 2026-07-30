@@ -22,15 +22,29 @@ export default function DpdBucketChart({ buckets }: DpdBucketChartProps) {
       </div>
       <div className="flex items-end justify-between gap-6 h-[240px]">
         {buckets.map((bucket) => {
-          const total = bucket.settled + bucket.activePtp + bucket.broken;
+          // `total` is authoritative from the backend — do not recompute from the
+          // 3 sub-counts (they may not always sum to it exactly).
+          const total = bucket.total;
           return (
-            <div key={bucket.label} className="flex-1 flex flex-col items-center gap-3">
+            <div key={bucket.bucket} className="flex-1 flex flex-col items-center gap-3">
               <div className="w-full flex flex-col-reverse rounded-t-lg overflow-hidden" style={{ height: MAX_HEIGHT_PX }}>
-                <div className="bg-on-background dark:bg-on-surface" style={{ height: `${(bucket.settled / total) * 100}%` }} />
-                <div className="bg-primary-fixed-dim" style={{ height: `${(bucket.activePtp / total) * 100}%` }} />
-                <div className="bg-outline-variant" style={{ height: `${(bucket.broken / total) * 100}%` }} />
+                <div
+                  className="bg-on-background dark:bg-on-surface"
+                  style={{ height: `${total > 0 ? (bucket.settled / total) * 100 : 0}%` }}
+                  title={`Settled: ${bucket.settled.toLocaleString('id-ID')}`}
+                />
+                <div
+                  className="bg-primary-fixed-dim"
+                  style={{ height: `${total > 0 ? (bucket.activePtp / total) * 100 : 0}%` }}
+                  title={`Active PTP: ${bucket.activePtp.toLocaleString('id-ID')}`}
+                />
+                <div
+                  className="bg-outline-variant"
+                  style={{ height: `${total > 0 ? (bucket.broken / total) * 100 : 0}%` }}
+                  title={`Broken: ${bucket.broken.toLocaleString('id-ID')}`}
+                />
               </div>
-              <p className="text-label-md text-on-surface-variant dark:text-surface-variant">{bucket.label}</p>
+              <p className="text-label-md text-on-surface-variant dark:text-surface-variant">{bucket.bucket}</p>
             </div>
           );
         })}

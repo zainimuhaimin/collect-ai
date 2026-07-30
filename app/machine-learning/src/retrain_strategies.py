@@ -6,8 +6,7 @@ import os
 import sys
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import StratifiedKFold, cross_val_score
-from sklearn.metrics import roc_auc_score
+from sklearn.model_selection import StratifiedGroupKFold, StratifiedKFold, cross_val_score
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.settings import (
@@ -64,9 +63,18 @@ def _build_xgb(y_series: pd.Series):
     )
 
 
-def _cross_validate(model, X, y) -> float:
-    cv = StratifiedKFold(n_splits=CV_N_SPLITS, shuffle=True, random_state=42)
-    scores = cross_val_score(model, X, y, cv=cv, scoring="roc_auc")
+def _cross_validate(model, X, y, groups=None) -> float:
+    """Grouped CV when `groups` (typically cust_id) is available, so contracts
+    belonging to the same customer never split across train/test — they share
+    the same latent behavioural profile, so an ungrouped split would leak
+    across folds and inflate the estimate. Falls back to a plain stratified
+    split only when no grouping key was provided."""
+    if groups is not None and pd.Series(groups).nunique() >= CV_N_SPLITS:
+        cv = StratifiedGroupKFold(n_splits=CV_N_SPLITS, shuffle=True, random_state=42)
+        scores = cross_val_score(model, X, y, cv=cv, groups=groups, scoring="roc_auc")
+    else:
+        cv = StratifiedKFold(n_splits=CV_N_SPLITS, shuffle=True, random_state=42)
+        scores = cross_val_score(model, X, y, cv=cv, scoring="roc_auc")
     return float(np.round(scores.mean(), 4))
 
 
@@ -80,7 +88,8 @@ def _raise_if_below_threshold(auc_value: float):
 def strategy_full_retrain(df_labeled, feature_cols, target_col="actual_paid"):
     df, X, y = _prepare_xy(df_labeled, feature_cols, target_col)
     model = _build_xgb(y)
-    cv_auc = _cross_validate(model, X, y)
+    groups = df["cust_id"] if "cust_id" in df.columns else None
+    cv_auc = _cross_validate(model, X, y, groups=groups)
     _raise_if_below_threshold(cv_auc)
     model.fit(X, y, verbose=False)
     return model, {
@@ -101,9 +110,10 @@ def strategy_rolling_window(df_labeled, feature_cols, target_col="actual_paid", 
     if len(df_window) < 500:
         raise ValueError(f"Data rolling window kurang dari 500: {len(df_window)}")
 
-    _, X, y = _prepare_xy(df_window, feature_cols, target_col)
+    df_window_prepared, X, y = _prepare_xy(df_window, feature_cols, target_col)
     model = _build_xgb(y)
-    cv_auc = _cross_validate(model, X, y)
+    groups = df_window_prepared["cust_id"] if "cust_id" in df_window_prepared.columns else None
+    cv_auc = _cross_validate(model, X, y, groups=groups)
     _raise_if_below_threshold(cv_auc)
     model.fit(X, y, verbose=False)
 
@@ -134,20 +144,25 @@ def strategy_recency_weighted(
     ).clip(lower=0)
     w = (decay_rate ** df["months_ago"]).astype(float)
 
+    # AUC reporting: build_target_variable() assigns ONE constant scoring_date
+    # to every row for initial training, so months_ago == 0 everywhere and the
+    # old "recent = df[months_ago <= 1]" slice WAS the entire training set —
+    # evaluating the just-fitted model on its own training rows, i.e. in-sample
+    # AUC, not a generalization estimate. There is no second time point to hold
+    # out here, so instead of a time-based split we report a proper grouped
+    # cross-validated AUC (grouped by cust_id where available, so a customer's
+    # contracts never span both sides of a fold) on a freshly-fit CV model,
+    # while the returned `model` below is still fit on the full data with
+    # recency weights for actual deployment.
+    cv_model = _build_xgb(y)
+    groups = df["cust_id"] if "cust_id" in df.columns else None
+    if y.nunique() > 1:
+        auc_val = _cross_validate(cv_model, X, y, groups=groups)
+    else:
+        auc_val = 0.5
+
     model = _build_xgb(y)
     model.fit(X, y, sample_weight=w, verbose=False)
-
-    recent = df[df["months_ago"] <= 1].copy()
-    if len(recent) >= 100 and recent[target_col].nunique() > 1:
-        y_recent = pd.to_numeric(recent[target_col], errors="coerce").fillna(0).astype(int)
-        X_recent = recent[feature_cols].apply(pd.to_numeric, errors="coerce").fillna(0.0)
-        auc_val = float(np.round(roc_auc_score(y_recent, model.predict_proba(X_recent)[:, 1]), 4))
-    else:
-        # fallback agar tetap bisa dipakai di dataset kecil
-        if y.nunique() > 1:
-            auc_val = float(np.round(roc_auc_score(y, model.predict_proba(X)[:, 1]), 4))
-        else:
-            auc_val = 0.5
 
     _raise_if_below_threshold(auc_val)
 

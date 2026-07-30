@@ -64,6 +64,7 @@ class RestructuringService:
             cust_id=contract.cust_id,
             product_type=contract.product_type,
             total_ots=contract.total_ots,
+            principal_ots=contract.principal_ots,
             interest_rate=contract.interest_rate,
             remaining_tenor_months=contract.remaining_tenor_months,
             installment_amount=contract.installment_amount,
@@ -98,6 +99,15 @@ class RestructuringService:
             policy=self._policy,
             sibling_contracts=sibling_inputs or None,
         )
+
+    def get_active_offer_reference(self, cust_id: str):
+        """Group restructuring_recommendation_output TERBARU untuk customer ini,
+        kalau ada — dipakai router untuk melengkapi on-demand assessment di atas
+        dengan restructure_group_id/offer_status supaya frontend tahu apakah ada
+        tawaran yang benar-benar bisa direspons (bukan cuma preview angka)."""
+        if self._offers is None:
+            return None
+        return self._offers.find_latest_for_customer(cust_id)
 
     def submit_customer_response(
         self, cust_id: str, restructure_group_id: str, response: str, today: Optional[date] = None

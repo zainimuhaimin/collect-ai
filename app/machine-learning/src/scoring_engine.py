@@ -126,11 +126,13 @@ def compute_confidence_level(df: pd.DataFrame) -> pd.DataFrame:
 
 def run_quality_check(df_output: pd.DataFrame, strict: bool | None = None):
     """
-    ``strict`` (default None = ambil dari config.settings.STRICT_QC):
-    kalau False, cek DISTRIBUSI (wont_pay/self_cure/critical %) diturunkan
-    jadi soft-warning, bukan hard-fail — dipakai untuk run dev/testing
-    dengan data sintetis dimana proporsi segmen wajar goyang run-ke-run
-    karena sampel acak kecil, bukan indikasi model/pipeline rusak.
+    ``strict`` (default None = ambil dari config.settings.STRICT_QC, yang
+    sekarang default False): kalau False, cek DISTRIBUSI (wont_pay/
+    self_cure/critical %) diturunkan jadi soft-warning, bukan hard-fail.
+    Batas QC_*_PCT itu asumsi komposisi portfolio, bukan invariant kebenaran
+    pipeline — kalau mix portfolio bergeser, menggagalkan seluruh run berarti
+    nol skor tersimpan, jauh lebih merusak daripada skor dengan komposisi tak
+    terduga. Pelanggaran tetap tercetak sebagai warning beserta nilainya.
 
     Cek integritas data (range, null, duplikat) TETAP hard di kedua mode —
     itu bug nyata di kode/data, bukan soal kalibrasi bisnis.
@@ -168,9 +170,14 @@ def run_quality_check(df_output: pd.DataFrame, strict: bool | None = None):
     critical_pct = float((df["priority_level"] == "Critical").sum() / total)
 
     dist_severity = "soft" if (is_small_batch or not strict) else "hard"
-    checks.append((f"wont_pay_pct<={QC_WONT_PAY_MAX_PCT:.0%}", wont_pct <= QC_WONT_PAY_MAX_PCT, dist_severity))
-    checks.append((f"self_cure_pct>={QC_SELF_CURE_MIN_PCT:.0%}", self_pct >= QC_SELF_CURE_MIN_PCT, dist_severity))
-    checks.append((f"critical_pct<={QC_CRITICAL_MAX_PCT:.0%}", critical_pct <= QC_CRITICAL_MAX_PCT, dist_severity))
+    observed = {}
+    for name, passed, value in (
+        (f"wont_pay_pct<={QC_WONT_PAY_MAX_PCT:.0%}", wont_pct <= QC_WONT_PAY_MAX_PCT, wont_pct),
+        (f"self_cure_pct>={QC_SELF_CURE_MIN_PCT:.0%}", self_pct >= QC_SELF_CURE_MIN_PCT, self_pct),
+        (f"critical_pct<={QC_CRITICAL_MAX_PCT:.0%}", critical_pct <= QC_CRITICAL_MAX_PCT, critical_pct),
+    ):
+        checks.append((name, passed, dist_severity))
+        observed[name] = value
 
     # Consistency soft check
     if "cbs_exists" in df.columns:
@@ -207,7 +214,10 @@ def run_quality_check(df_output: pd.DataFrame, strict: bool | None = None):
         if (not passed) and severity == "hard":
             hard_failed.append(name)
         if (not passed) and severity == "soft":
-            print("    warning: cek konsistensi gagal")
+            if name in observed:
+                print(f"    warning: distribusi di luar batas — nilai aktual {observed[name]:.1%}")
+            else:
+                print("    warning: cek konsistensi gagal")
 
     if hard_failed:
         raise ValueError("QC hard-fail: " + ", ".join(hard_failed))

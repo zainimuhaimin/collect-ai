@@ -5,22 +5,27 @@ export const queryKeys = {
   dashboard: {
     summary: ['dashboard', 'summary'] as const,
   },
-  performance: {
-    filters: ['performance', 'filters'] as const,
-    summary: ['performance', 'summary'] as const,
-    collectorRanking: (page: number) => ['performance', 'collectorRanking', page] as const,
-    operationalLog: ['performance', 'operationalLog'] as const,
-  },
   aiIntelligence: {
     modelConfig: ['aiIntelligence', 'modelConfig'] as const,
     operationalLog: ['aiIntelligence', 'operationalLog'] as const,
-  },
-  workbench: {
-    accounts: (filter: string, search: string) => ['workbench', 'accounts', filter, search] as const,
-    activityLog: ['workbench', 'activityLog'] as const,
+    syncStatus: ['aiIntelligence', 'syncStatus'] as const,
   },
   customer: {
     detail: (customerId: string) => ['customer', customerId, 'detail'] as const,
-    timeline: (customerId: string) => ['customer', customerId, 'timeline'] as const,
+    list: (filter: string, search: string, page: number, pageSize: number) =>
+      ['customer', 'list', filter, search, page, pageSize] as const,
+    contracts: (customerId: string) => ['customer', customerId, 'contracts'] as const,
+  },
+  contract: {
+    list: (filter: string, search: string, page: number, pageSize: number) =>
+      ['contract', 'list', filter, search, page, pageSize] as const,
+    detail: (contractNo: string) => ['contract', contractNo, 'detail'] as const,
+    activityLog: (contractNo: string) => ['contract', contractNo, 'activityLog'] as const,
+  },
+  restructuring: {
+    options: (customerId: string) => ['restructuring', customerId, 'options'] as const,
+    groups: (status: string, search: string, page: number, pageSize: number) =>
+      ['restructuring', 'groups', status, search, page, pageSize] as const,
+    groupDetail: (groupId: string) => ['restructuring', 'groups', 'detail', groupId] as const,
   },
 } as const;

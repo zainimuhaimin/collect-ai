@@ -32,6 +32,13 @@ class Settings(BaseSettings):
 
     cors_allow_origins: list[str] = ["http://localhost:5173"]
 
+    # AI Intelligence Sync (services/ai_intelligence_sync_service.py) — subprocess
+    # ke app/machine-learning/pipelines/*.py butuh interpreter Python yang tahu
+    # dependency ML (pandas/sklearn/dst). Default kosong -> pakai sys.executable
+    # (proses backend & ML share 1 venv saat ini) — TIDAK di-hardcode supaya
+    # kedua app tetap bisa dipisah venv-nya nanti tanpa ubah kode.
+    ml_python_interpreter: str = ""
+
     @property
     def database_url(self) -> str:
         return f"postgresql://{self.pguser}:{self.pgpassword}@{self.pghost}:{self.pgport}/{self.pgdatabase}"

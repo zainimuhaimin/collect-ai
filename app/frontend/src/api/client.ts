@@ -32,7 +32,11 @@ export const apiClient = ky.create({
   },
 });
 
-export async function apiRequest<T>(promise: Promise<Response>, schema: ZodType<T>): Promise<T> {
+export async function apiRequest<T>(
+  promise: Promise<Response>,
+  schema: ZodType<T>,
+  mapper?: (raw: unknown) => unknown,
+): Promise<T> {
   let response: Response;
   try {
     response = await promise;
@@ -41,7 +45,7 @@ export async function apiRequest<T>(promise: Promise<Response>, schema: ZodType<
   }
 
   const json = await response.json();
-  const parsed = schema.safeParse(json);
+  const parsed = schema.safeParse(mapper ? mapper(json) : json);
   if (!parsed.success) {
     throw new ApiError('Received unexpected data shape from the server.', 'validation', response.status, parsed.error);
   }

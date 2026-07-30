@@ -17,7 +17,11 @@ export default function DashboardSkeleton({ className = '' }: DashboardSkeletonP
         <Skeleton className="lg:col-span-2 h-72 rounded-xl" />
         <Skeleton className="h-72 rounded-xl" />
       </div>
-      <Skeleton className="h-80 rounded-xl" />
+      <Skeleton className="h-40 rounded-xl" />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Skeleton className="h-64 rounded-xl" />
+        <Skeleton className="h-64 rounded-xl" />
+      </div>
     </div>
   );
 }

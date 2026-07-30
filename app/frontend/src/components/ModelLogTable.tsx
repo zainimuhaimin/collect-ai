@@ -1,4 +1,5 @@
 import type { ModelLogEntry } from '../domains/ai-intelligence/aiIntelligence.schema';
+import { formatDateTimeHuman } from '../lib/format';
 import Chip from './Chip';
 
 interface ModelLogTableProps {
@@ -27,7 +28,7 @@ export default function ModelLogTable({ entries }: ModelLogTableProps) {
         <tbody>
           {entries.map((entry) => (
             <tr key={`${entry.timestamp}-${entry.action}`} className="border-b border-outline-variant dark:border-outline-variant/20">
-              <td className="py-4 pr-4 text-body-md text-on-surface-variant dark:text-surface-variant">{entry.timestamp}</td>
+              <td className="py-4 pr-4 text-body-md text-on-surface-variant dark:text-surface-variant">{formatDateTimeHuman(entry.timestamp)}</td>
               <td className="py-4 pr-4 text-label-lg font-semibold text-on-surface dark:text-on-background">{entry.action}</td>
               <td className="py-4 pr-4 text-body-md text-on-surface dark:text-on-background">{entry.user}</td>
               <td className="py-4 pr-4">

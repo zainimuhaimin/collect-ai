@@ -20,12 +20,9 @@ from config.settings import (
     CYCLE_MAP,
     RESULT_CODE_MAP,
     BEHAVIORAL_GRADE_MAP,
-    WEIGHT_PAYMENT_RATE,
-    WEIGHT_PTP_RELIABILITY,
-    WEIGHT_INTERACTION,
-    WEIGHT_DELAY_SCORE,
     MIN_MONTHS_POST_RESTRUCTURE_FOR_TRAINING,
 )
+from src.governance_config import get_cbs_weights
 
 
 # ────────────────────────────────────────────────────────────────────
@@ -485,17 +482,20 @@ def compute_customer_features(
     agg["income_proxy"] = agg["cust_income_level"].map(INCOME_PROXY).fillna(8_000_000)
     agg["income_debt_ratio"] = (agg["total_active_ots"] / agg["income_proxy"]).astype(float)
 
-    # composite_behavioral_score
+    # composite_behavioral_score — bobot dari model_governance_config (Bobot
+    # CBS di halaman AI Intelligence), fallback ke settings.py kalau tabel/DB
+    # tidak tersedia. Dipanggil sekali per invocation, bukan per-baris.
+    cbs_weights = get_cbs_weights()
     payment_rate_w = agg["avg_payment_rate"].fillna(0.0)
     ptp_rel = agg["ptp_reliability_index"].fillna(0.0)
     inter_norm = ((agg["avg_interaction_score_cust"].fillna(1.0) - 1.0) / 4.0).clip(0, 1)
     delay_score = (1.0 - (agg["avg_delay_days_cust"].fillna(0.0) / 90.0)).clip(0, 1)
 
     agg["composite_behavioral_score"] = (
-        payment_rate_w * WEIGHT_PAYMENT_RATE
-        + ptp_rel * WEIGHT_PTP_RELIABILITY
-        + inter_norm * WEIGHT_INTERACTION
-        + delay_score * WEIGHT_DELAY_SCORE
+        payment_rate_w * cbs_weights["WEIGHT_PAYMENT_RATE"]
+        + ptp_rel * cbs_weights["WEIGHT_PTP_RELIABILITY"]
+        + inter_norm * cbs_weights["WEIGHT_INTERACTION"]
+        + delay_score * cbs_weights["WEIGHT_DELAY_SCORE"]
     ).clip(0, 1)
 
     return agg

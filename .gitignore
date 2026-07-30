@@ -7,3 +7,4 @@ venv
 .stitch
 .claude
 .env
+__pycache__

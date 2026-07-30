@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from core.dependencies import get_auth_service, get_current_user
+from core.text_utils import compute_initials
 from domain.models import User
 from schemas.auth import LoginRequest, LoginResponse, UserOut
 from services.auth_service import AuthService
@@ -8,17 +9,8 @@ from services.auth_service import AuthService
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-def _compute_initials(name: str, max_letters: int = 2) -> str:
-    parts = [p for p in name.strip().split() if p]
-    if not parts:
-        return ""
-    if len(parts) == 1:
-        return parts[0][:max_letters].upper()
-    return "".join(p[0].upper() for p in parts[:max_letters])
-
-
 def _to_user_out(user: User) -> UserOut:
-    return UserOut(name=user.name, role=user.role, initials=_compute_initials(user.name))
+    return UserOut(name=user.name, role=user.role, initials=compute_initials(user.name))
 
 
 @router.post(

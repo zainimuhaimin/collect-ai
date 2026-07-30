@@ -7,6 +7,7 @@ disentuh (DIP, lihat backend-architecture-tasks.md Catatan #2).
 """
 
 from functools import lru_cache
+from typing import Optional
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -16,18 +17,29 @@ from sqlalchemy.engine import Engine
 from core.config import settings
 from domain.models import User
 from repositories.interfaces import (
+    IAiIntelligenceSyncRepository,
     IContractRepository,
     ICustomerRepository,
+    IDashboardRepository,
+    IGovernanceConfigRepository,
     IRestructuringOfferRepository,
     IUserRepository,
 )
+from repositories.ai_intelligence_sync_repository import AiIntelligenceSyncRepository
 from repositories.contract_repository import ContractRepository
 from repositories.customer_repository import CustomerRepository
+from repositories.dashboard_repository import DashboardRepository
+from repositories.governance_repository import GovernanceConfigRepository
 from repositories.restructuring_offer_repository import RestructuringOfferRepository
 from repositories.user_repository import UserRepository
+from services.ai_intelligence_sync_service import AiIntelligenceSyncService
 from services.auth_service import AuthService
 from services.customer_service import CustomerService
+from services.contract_service import ContractService
+from services.dashboard_service import DashboardService
+from services.governance_service import GovernanceService
 from services.restructuring_service import RestructuringService
+from services.restructuring_group_service import RestructuringGroupService
 
 
 @lru_cache
@@ -55,14 +67,36 @@ def get_user_repository() -> IUserRepository:
     return UserRepository(get_engine())
 
 
+@lru_cache
+def get_dashboard_repository() -> IDashboardRepository:
+    return DashboardRepository(get_engine())
+
+
+@lru_cache
+def get_governance_repository() -> IGovernanceConfigRepository:
+    return GovernanceConfigRepository(get_engine())
+
+
+@lru_cache
+def get_ai_intelligence_sync_repository() -> IAiIntelligenceSyncRepository:
+    return AiIntelligenceSyncRepository(get_engine())
+
+
 # NOTE: repository di-inject lewat Depends() di sini (bukan dipanggil
 # langsung sebagai fungsi Python biasa) supaya masuk ke dependency graph
 # FastAPI yang sesungguhnya — ini yang membuat app.dependency_overrides di
 # test bisa menembus sampai ke repository level, bukan cuma stuck di service.
 def get_customer_service(
     customer_repo: ICustomerRepository = Depends(get_customer_repository),
+    contract_repo: IContractRepository = Depends(get_contract_repository),
 ) -> CustomerService:
-    return CustomerService(customer_repo)
+    return CustomerService(customer_repo, contract_repo)
+
+
+def get_contract_service(
+    contract_repo: IContractRepository = Depends(get_contract_repository),
+) -> ContractService:
+    return ContractService(contract_repo)
 
 
 def get_restructuring_service(
@@ -71,6 +105,35 @@ def get_restructuring_service(
     offer_repo: IRestructuringOfferRepository = Depends(get_restructuring_offer_repository),
 ) -> RestructuringService:
     return RestructuringService(customer_repo, contract_repo, offer_repo)
+
+
+def get_restructuring_group_service(
+    offer_repo: IRestructuringOfferRepository = Depends(get_restructuring_offer_repository),
+) -> RestructuringGroupService:
+    return RestructuringGroupService(offer_repo)
+
+
+def get_dashboard_service(
+    dashboard_repo: IDashboardRepository = Depends(get_dashboard_repository),
+) -> DashboardService:
+    return DashboardService(dashboard_repo)
+
+
+def get_governance_service(
+    governance_repo: IGovernanceConfigRepository = Depends(get_governance_repository),
+) -> GovernanceService:
+    return GovernanceService(governance_repo)
+
+
+# NOTE: SENGAJA tidak di-@lru_cache seperti service lain — tidak masalah,
+# state job Sync sendiri hidup di module-level singleton di
+# services/ai_intelligence_sync_service.py (bukan di instance service ini),
+# jadi tetap 1 job untuk seluruh proses biarpun instance service-nya dibuat
+# ulang tiap request.
+def get_ai_intelligence_sync_service(
+    sync_repo: IAiIntelligenceSyncRepository = Depends(get_ai_intelligence_sync_repository),
+) -> AiIntelligenceSyncService:
+    return AiIntelligenceSyncService(sync_repo)
 
 
 def get_auth_service(
@@ -87,7 +150,7 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
     auth_service: AuthService = Depends(get_auth_service),
 ) -> User:
     if credentials is None:

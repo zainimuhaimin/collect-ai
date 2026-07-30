@@ -37,6 +37,7 @@ from src.restructuring_offer_calculator import (  # noqa: E402
     CustomerContext,
     EligibilityTier,
     assess_restructuring_options,
+    effective_remaining_tenor,
     restructuring_policy_from_settings,
 )
 
@@ -91,13 +92,19 @@ def _load_scores_from_db(engine, ref_date) -> pd.DataFrame:
 
 
 def _to_contract_input(row, reference_date) -> ContractInput:
-    total_ots = float(row.get("prnc_ots") or 0) + float(row.get("intr_ots") or 0)
+    principal_ots = float(row.get("prnc_ots") or 0)
+    # total_ots = kewajiban BRUTO (pokok + bunga belum jatuh tempo). Keduanya
+    # diteruskan terpisah: yang diamortisasi ulang HANYA pokok, sedangkan yang
+    # bruto dipakai untuk sisa jumlah cicilan & cakupan aset — lihat koreksi #1
+    # di docstring shared/restructuring_offer_calculator.py.
+    total_ots = principal_ots + float(row.get("intr_ots") or 0)
     interest_rate = row.get("interest_rate")
     return ContractInput(
         contract_no=row["contract_no"],
         cust_id=row["cust_id"],
         product_type=row.get("product_type") or "Unknown",
         total_ots=total_ots,
+        principal_ots=principal_ots,
         interest_rate=float(interest_rate) if pd.notna(interest_rate) else 0.0,
         remaining_tenor_months=_remaining_tenor_months(row.get("maturity_date"), reference_date),
         installment_amount=float(row.get("installment_amount") or 0.0),
@@ -134,11 +141,25 @@ def _qc_check_offer(offer, contract_input: ContractInput, policy) -> list[str]:
     ada perubahan kode di masa depan yang tidak sengaja melewatinya."""
     violations: list[str] = []
 
-    if offer.npv_restructured <= offer.npv_baseline:
+    # Sisi lender — basis yang SAMA dengan apply_guardrail() (dua-duanya
+    # risk-adjusted). Dulu di sini memakai npv_restructured mentah, ikut
+    # mewarisi perbandingan tidak sebanding yang membuat 100% offer lolos.
+    if offer.npv_restructured_risk_adjusted <= offer.npv_baseline:
         violations.append(
             f"{offer.offer_type.value} {contract_input.contract_no}: "
-            "npv_restructured tidak lebih baik dari npv_baseline (lolos guardrail?)"
+            "NPV risk-adjusted tidak lebih baik dari baseline (lolos guardrail?)"
         )
+
+    # Sisi nasabah — safety net kalau guardrail dilewati perubahan kode nanti.
+    is_full_payoff = offer.recommended_new_tenor_months <= 0 and offer.recommended_new_installment <= 0
+    if not is_full_payoff and offer.current_installment_total > 0:
+        max_new_installment = offer.current_installment_total * (1 - policy.min_installment_reduction_pct)
+        if offer.recommended_new_installment > max_new_installment + 0.01:
+            violations.append(
+                f"{offer.offer_type.value} {contract_input.contract_no}: cicilan baru "
+                f"{offer.recommended_new_installment:,.0f} tidak lebih ringan dari cicilan sekarang "
+                f"{offer.current_installment_total:,.0f} (lolos guardrail?)"
+            )
 
     if offer.offer_type.value in ("REFINANCE", "TAKEOVER") and offer.recommended_new_rate > 0:
         # Formula sama dengan calculate_refinance_offer/calculate_takeover_offer —
@@ -158,11 +179,15 @@ def _qc_check_offer(offer, contract_input: ContractInput, policy) -> list[str]:
             )
 
     if offer.offer_type.value == "REFINANCE":
+        # Basis tenor-nya effective_remaining_tenor(), sama dengan yang dipakai
+        # calculate_refinance_offer() — BUKAN remaining_tenor_months dari
+        # maturity_date, yang mengabaikan tunggakan (lihat koreksi #2).
+        base_tenor = effective_remaining_tenor(contract_input)
         max_ext = min(
             policy.max_tenor_extension_months,
-            int(contract_input.remaining_tenor_months * policy.max_tenor_extension_ratio),
+            int(base_tenor * policy.max_tenor_extension_ratio),
         )
-        max_allowed_tenor = contract_input.remaining_tenor_months + max_ext
+        max_allowed_tenor = base_tenor + max_ext
         if offer.recommended_new_tenor_months > max_allowed_tenor + 1:
             violations.append(
                 f"REFINANCE {contract_input.contract_no}: tenor {offer.recommended_new_tenor_months} "
@@ -238,9 +263,18 @@ def run_restructuring_assessment(reference_date=None, engine=None, df_scored: pd
             contract_input = _to_contract_input(row, ref_date)
             customer = _to_customer_context(row["cust_id"], cbs_by_cust.get(row["cust_id"]))
 
-            sibling_rows = contracts[
-                (contracts["cust_id"] == row["cust_id"]) & (contracts["contract_no"] != row["contract_no"])
+            # Dari `merged`, BUKAN `contracts`: `contracts` adalah
+            # contract_snapshot mentah tanpa kolom recovery_score, sehingga
+            # setiap sibling masuk ke kalkulator dengan recovery_score=0.0.
+            # Akibatnya kontribusi sibling ke npv_baseline CONSOLIDATE jadi nol
+            # (baseline hanya sebesar kontrak utama — mis. CUST-00001 tercatat
+            # 1.126.647 padahal seharusnya 2.154.649), jadi guardrail menilai
+            # tawaran konsolidasi terhadap pembanding yang terlalu rendah dan
+            # meloloskannya terlalu mudah.
+            sibling_rows = merged[
+                (merged["cust_id"] == row["cust_id"]) & (merged["contract_no"] != row["contract_no"])
             ]
+            sibling_rows = sibling_rows[sibling_rows["recovery_score"].notna()]
             if CONSOLIDATION_PROBLEM_CONTRACTS_ONLY:
                 sibling_rows = sibling_rows[
                     pd.to_numeric(sibling_rows["dpd_current"], errors="coerce").fillna(0) >= MIN_DPD_FOR_RESTRUCTURE

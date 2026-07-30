@@ -27,12 +27,14 @@ from src.restructuring_offer_calculator import (  # noqa: E402
     OfferType,
     RestructureOffer,
     RestructurePolicy,
+    amortizable_principal,
     apply_guardrail,
     assess_restructuring_options,
     calculate_consolidation_offer,
     calculate_refinance_offer,
     calculate_takeover_offer,
     classify_eligibility,
+    effective_remaining_tenor,
 )
 
 POLICY = RestructurePolicy()
@@ -135,13 +137,52 @@ class TestRefinanceOffer:
     def test_new_tenor_extended_within_cap(self):
         contract = _make_contract(remaining_tenor_months=18)
         offer = calculate_refinance_offer(contract, POLICY)
-        max_ext = min(POLICY.max_tenor_extension_months, int(18 * POLICY.max_tenor_extension_ratio))
-        assert offer.recommended_new_tenor_months == 18 + max_ext
+        base = effective_remaining_tenor(contract)
+        max_ext = min(POLICY.max_tenor_extension_months, int(base * POLICY.max_tenor_extension_ratio))
+        assert offer.recommended_new_tenor_months == base + max_ext
+
+    def test_tenor_base_is_unpaid_installments_not_maturity_date(self):
+        """Koreksi #2: basis tenor adalah jumlah cicilan yang masih terutang
+        (total_ots / installment), BUKAN jarak ke maturity_date. Nasabah
+        menunggak punya sisa cicilan melebihi maturity kontraknya, dan memakai
+        maturity_date memaksa saldo besar ke jendela pendek sehingga cicilan
+        barunya meledak. Di sini maturity_date sengaja menyatakan 2 bulan lagi
+        padahal masih ada ~14 cicilan terutang."""
+        contract = _make_contract(
+            total_ots=15_000_000, installment_amount=1_100_000, remaining_tenor_months=2
+        )
+        assert effective_remaining_tenor(contract) == 14
+        offer = calculate_refinance_offer(contract, POLICY)
+        assert offer.recommended_new_tenor_months == 14 + 7
+        # Dengan perilaku lama (basis 2 bulan) cicilannya akan jadi jutaan —
+        # jauh di atas cicilan sekarang. Sekarang harus lebih ringan.
+        assert offer.recommended_new_installment < contract.installment_amount
+
+    def test_amortizes_principal_not_gross_obligation(self):
+        """Koreksi #1: yang diamortisasi ulang adalah pokok terutang, bukan
+        total_ots yang sudah mengandung bunga belum jatuh tempo — kalau bruto
+        dipakai, bunga baru ditumpuk di atas bunga lama."""
+        gross = _make_contract(total_ots=15_000_000, principal_ots=0.0)
+        with_principal = _make_contract(total_ots=15_000_000, principal_ots=13_000_000)
+        assert amortizable_principal(gross) == 15_000_000       # fallback
+        assert amortizable_principal(with_principal) == 13_000_000
+        # Tenor identik (dihitung dari total_ots bruto di kedua kasus), jadi
+        # perbedaan cicilan murni berasal dari pokok yang benar.
+        offer_gross = calculate_refinance_offer(gross, POLICY)
+        offer_principal = calculate_refinance_offer(with_principal, POLICY)
+        assert offer_principal.recommended_new_tenor_months == offer_gross.recommended_new_tenor_months
+        assert offer_principal.recommended_new_installment < offer_gross.recommended_new_installment
 
     def test_offer_type_is_refinance(self):
         offer = calculate_refinance_offer(_make_contract(), POLICY)
         assert offer.offer_type == OfferType.REFINANCE
         assert offer.contract_nos == ["C001"]
+
+    def test_current_installment_is_carried_for_comparison(self):
+        """Tanpa angka pembanding, "cicilan baru" tidak punya makna dan
+        guardrail sisi nasabah tidak bisa diuji."""
+        offer = calculate_refinance_offer(_make_contract(installment_amount=1_100_000), POLICY)
+        assert offer.current_installment_total == pytest.approx(1_100_000)
 
 
 # ── TASK-51: Consolidation ───────────────────────────────────────────
@@ -166,8 +207,22 @@ class TestConsolidationOffer:
         c2 = _make_contract(contract_no="C002", total_ots=5_000_000, interest_rate=0.30)
         offer = calculate_consolidation_offer([c1, c2], POLICY)
         weighted = (10_000_000 * 0.20 + 5_000_000 * 0.30) / 15_000_000
-        expected_rate = max(weighted * (1 - POLICY.max_haircut_pct), POLICY.min_rate_floor)
+        expected_rate = max(
+            min(weighted * (1 - POLICY.max_haircut_pct), min(0.20, 0.30)),
+            POLICY.min_rate_floor,
+        )
         assert offer.recommended_new_rate == pytest.approx(round(expected_rate, 4))
+
+    def test_rate_never_exceeds_cheapest_existing_contract(self):
+        """Rata-rata tertimbang bisa lebih tinggi dari salah satu kontrak,
+        sehingga melebur justru MENAIKKAN bunga pinjaman termurah nasabah
+        (kasus nyata: 12,24% + 37,69% -> 19,24%, naik 57%). Nasabah tahu
+        rate-nya sendiri — "satu rate lebih ringan" yang ternyata lebih mahal
+        adalah cara tercepat kehilangan kepercayaan."""
+        cheap = _make_contract(contract_no="C001", total_ots=2_000_000, interest_rate=0.1224)
+        pricey = _make_contract(contract_no="C002", total_ots=20_000_000, interest_rate=0.3769)
+        offer = calculate_consolidation_offer([cheap, pricey], POLICY)
+        assert offer.recommended_new_rate <= 0.1224 + 5e-5
 
 
 # ── TASK-51: Takeover (termasuk edge case) ───────────────────────────
@@ -221,27 +276,93 @@ class TestTakeoverOffer:
 # ── TASK-51: Guardrail ─────────────────────────────────────────────────
 
 class TestGuardrail:
-    def test_fails_when_npv_restructured_not_better(self):
-        offer = RestructureOffer(
-            offer_type=OfferType.REFINANCE, contract_nos=["C001"], cust_id="CUST01",
-            total_ots_combined=10_000_000, recommended_new_tenor_months=24,
-            recommended_new_rate=0.15, recommended_new_installment=500_000,
-            npv_baseline=8_000_000, npv_restructured=7_000_000,  # lebih buruk
-        )
-        result = apply_guardrail(offer)
-        assert result.is_guardrail_passed is False
-        assert len(result.rejection_reasons) > 0
+    """Guardrail menguji DUA sisi: lender (NPV membaik) dan nasabah (tawaran
+    benar-benar keringanan). Sisi nasabah tidak ada sebelum audit 2026-07-30,
+    sehingga 100% tawaran lolos sambil 80%-nya menaikkan cicilan nasabah."""
 
-    def test_passes_when_npv_restructured_better(self):
-        offer = RestructureOffer(
+    @staticmethod
+    def _offer(**overrides) -> RestructureOffer:
+        base = dict(
             offer_type=OfferType.REFINANCE, contract_nos=["C001"], cust_id="CUST01",
             total_ots_combined=10_000_000, recommended_new_tenor_months=24,
-            recommended_new_rate=0.15, recommended_new_installment=500_000,
+            recommended_new_rate=0.15, recommended_new_installment=700_000,
             npv_baseline=7_000_000, npv_restructured=8_000_000,
+            npv_restructured_risk_adjusted=8_000_000,
+            current_installment_total=1_000_000,
+            total_remaining_current=20_000_000, total_new_schedule=16_800_000,
         )
-        result = apply_guardrail(offer)
+        base.update(overrides)
+        return RestructureOffer(**base)
+
+    def test_fails_when_npv_not_better(self):
+        result = apply_guardrail(self._offer(npv_restructured_risk_adjusted=6_000_000), POLICY)
+        assert result.is_guardrail_passed is False
+        assert any("NPV" in r for r in result.rejection_reasons)
+
+    def test_npv_compared_on_risk_adjusted_basis_not_raw(self):
+        """Perilaku lama membandingkan npv_restructured MENTAH terhadap
+        npv_baseline yang sudah didiskon recovery_score (~70%), sehingga
+        praktis tidak bisa gagal. Di sini yang mentah tampak menang
+        (9jt > 7jt) tapi yang risk-adjusted kalah — harus DITOLAK."""
+        result = apply_guardrail(
+            self._offer(npv_restructured=9_000_000, npv_restructured_risk_adjusted=3_150_000),
+            POLICY,
+        )
+        assert result.is_guardrail_passed is False
+
+    def test_passes_when_better_for_both_sides(self):
+        result = apply_guardrail(self._offer(), POLICY)
         assert result.is_guardrail_passed is True
         assert result.rejection_reasons == []
+
+    def test_fails_when_installment_goes_up(self):
+        """Kasus paling merusak di data lama: 79,9% tawaran mengusulkan cicilan
+        LEBIH TINGGI dan tetap lolos."""
+        result = apply_guardrail(self._offer(recommended_new_installment=1_500_000), POLICY)
+        assert result.is_guardrail_passed is False
+        assert any("cicilan baru" in r for r in result.rejection_reasons)
+
+    def test_fails_when_installment_reduction_is_token(self):
+        """Turun Rp1.411/bulan (kasus nyata) secara teknis "lebih rendah" tapi
+        tidak mungkin dijual sebagai keringanan."""
+        result = apply_guardrail(self._offer(recommended_new_installment=998_589), POLICY)
+        assert result.is_guardrail_passed is False
+
+    def test_fails_when_total_repayment_balloons(self):
+        result = apply_guardrail(
+            self._offer(total_remaining_current=10_000_000, total_new_schedule=30_000_000),
+            POLICY,
+        )
+        assert result.is_guardrail_passed is False
+        assert any("total bayar" in r for r in result.rejection_reasons)
+
+    def test_moderate_total_increase_is_allowed(self):
+        """Total bayar naik sedikit itu harga wajar dari tenor lebih panjang —
+        yang dilarang hanya lonjakan tidak proporsional."""
+        result = apply_guardrail(
+            self._offer(total_remaining_current=15_000_000, total_new_schedule=16_800_000),
+            POLICY,
+        )
+        assert result.is_guardrail_passed is True
+
+    def test_fails_when_current_installment_unknown(self):
+        """Tanpa pembanding, klaim "lebih ringan" tidak bisa dibuktikan —
+        tolak, jangan diam-diam diloloskan."""
+        result = apply_guardrail(self._offer(current_installment_total=0.0), POLICY)
+        assert result.is_guardrail_passed is False
+
+    def test_full_payoff_takeover_skips_installment_check(self):
+        """Aset menutup seluruh kewajiban — tidak ada cicilan baru sama sekali,
+        jadi tidak ada "cicilan lebih ringan" yang bisa dibandingkan."""
+        result = apply_guardrail(
+            self._offer(
+                offer_type=OfferType.TAKEOVER,
+                recommended_new_tenor_months=0, recommended_new_installment=0.0,
+                total_remaining_current=10_000_000, total_new_schedule=10_000_000,
+            ),
+            POLICY,
+        )
+        assert result.is_guardrail_passed is True
 
 
 # ── Orchestrator: assess_restructuring_options ────────────────────────

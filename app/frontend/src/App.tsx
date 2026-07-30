@@ -4,10 +4,13 @@ import RootRedirect from './auth/RootRedirect';
 import LoginPage from './pages/LoginPage';
 import RecoveryAccessPage from './pages/RecoveryAccessPage';
 import DashboardPage from './pages/DashboardPage';
-import PerformancePage from './pages/PerformancePage';
 import AiIntelligencePage from './pages/AiIntelligencePage';
-import CollectorWorkbenchPage from './pages/CollectorWorkbenchPage';
+import CustomerListPage from './pages/CustomerListPage';
 import CustomerDetailPage from './pages/CustomerDetailPage';
+import ContractListPage from './pages/ContractListPage';
+import ContractDetailPage from './pages/ContractDetailPage';
+import RestructuringApprovalPage from './pages/RestructuringApprovalPage';
+import RestructuringGroupDetailPage from './pages/RestructuringGroupDetailPage';
 
 export default function App() {
   return (
@@ -25,26 +28,10 @@ export default function App() {
           }
         />
         <Route
-          path="/performance"
+          path="/customers"
           element={
             <RequireAuth>
-              <PerformancePage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/ai-intelligence"
-          element={
-            <RequireAuth>
-              <AiIntelligencePage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/workbench"
-          element={
-            <RequireAuth>
-              <CollectorWorkbenchPage />
+              <CustomerListPage />
             </RequireAuth>
           }
         />
@@ -53,6 +40,46 @@ export default function App() {
           element={
             <RequireAuth>
               <CustomerDetailPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/contracts"
+          element={
+            <RequireAuth>
+              <ContractListPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/contracts/:contractNo"
+          element={
+            <RequireAuth>
+              <ContractDetailPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/restructuring-approval"
+          element={
+            <RequireAuth>
+              <RestructuringApprovalPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/restructuring-approval/:id"
+          element={
+            <RequireAuth>
+              <RestructuringGroupDetailPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/ai-intelligence"
+          element={
+            <RequireAuth>
+              <AiIntelligencePage />
             </RequireAuth>
           }
         />

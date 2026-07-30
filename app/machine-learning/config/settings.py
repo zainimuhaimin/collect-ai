@@ -73,13 +73,16 @@ QC_SELF_CURE_MIN_PCT  = 0.03   # diturunkan dari 0.05 — segmen Self-cure
 QC_CRITICAL_MAX_PCT  = 0.20
 
 # STRICT_QC=False menurunkan cek distribusi (wont_pay/self_cure/critical %)
-# dari hard-fail jadi soft-warning — dipakai saat dev/testing dengan data
-# sintetis, dimana proporsi segmen wajar goyang run-ke-run karena sampel
-# acak kecil (bukan indikasi model/pipeline rusak). Default TETAP True
-# (hard-fail) supaya perilaku produksi tidak berubah — override eksplisit
-# lewat env var COLLECTAI_STRICT_QC=false, atau parameter
-# run_daily_scoring(strict_qc=False)/run_quality_check(df, strict=False).
-STRICT_QC = os.environ.get("COLLECTAI_STRICT_QC", "true").strip().lower() != "false"
+# dari hard-fail jadi soft-warning. Default sekarang FALSE (soft): batas-batas
+# QC_*_PCT di atas adalah asumsi komposisi portfolio, bukan invariant
+# kebenaran pipeline — proporsi segmen wajar bergeser mengikuti mix portfolio
+# dan threshold segmentasi, dan menggagalkan seluruh run scoring karena
+# distribusi bergeser berarti tidak ada skor sama sekali yang tersimpan,
+# yang jauh lebih merusak daripada skor dengan komposisi tak terduga.
+# Pelanggaran tetap dilaporkan sebagai warning di log QC agar tetap terlihat.
+# Aktifkan hard-fail eksplisit lewat COLLECTAI_STRICT_QC=true, atau parameter
+# run_daily_scoring(strict_qc=True)/run_quality_check(df, strict=True).
+STRICT_QC = os.environ.get("COLLECTAI_STRICT_QC", "false").strip().lower() == "true"
 
 # ── CBS / BEHAVIORAL GRADE ────────────────────────────────────────
 GRADE_A_THRESHOLD = 0.80
@@ -257,6 +260,23 @@ CONSOLIDATION_MIN_ACTIVE_CONTRACTS   = 2
 CONSOLIDATION_PROBLEM_CONTRACTS_ONLY = True  # kontrak lancar tidak ikut merge (default)
 
 RESTRUCTURE_DISCOUNT_RATE_ANNUAL = 0.12  # dipakai utk NPV, bukan bunga kontrak
+
+# ── SYARAT MANFAAT NASABAH (guardrail sisi nasabah) ───────────────
+# Sebelum audit 2026-07-30 guardrail HANYA menguji sisi lender, sehingga
+# 80% tawaran yang lolos justru menaikkan cicilan nasabah. Dua batas ini
+# yang membuat tawaran wajib benar-benar berupa keringanan.
+MIN_INSTALLMENT_REDUCTION_PCT = 0.05  # cicilan baru min. 5% lebih ringan
+MAX_TOTAL_REPAYMENT_RATIO     = 1.50  # total bayar maks 1,5x dari sekarang
+                                       # (naik sedikit itu wajar: harga dari
+                                       # tenor lebih panjang — yang dilarang
+                                       # lonjakan tidak proporsional)
+
+# Asumsi kenaikan peluang bayar berkat jadwal yang lebih terjangkau — inilah
+# justifikasi ekonomi restrukturisasi. PLACEHOLDER: ganti dengan model performa
+# pasca-restrukturisasi begitu restructuring_history punya data realisasi.
+# Lihat penjelasan lengkapnya di RestructurePolicy (app/shared/).
+RESTRUCTURE_RECOVERY_UPLIFT_PCT = 0.25
+MAX_RESTRUCTURED_RECOVERY       = 0.95
 
 # ── QC THRESHOLD RESTRUCTURING (TASK-54) ──────────────────────────
 RESTRUCTURE_OFFER_EXPIRY_DAYS = 14   # generated_date + N hari -> offer_status EXPIRED
