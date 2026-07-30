@@ -5,6 +5,15 @@ kredit. Sumber datanya adalah **Postgres yang sama** dipakai pipeline
 `app/machine-learning/` — tidak ada mock/in-memory repository, semua endpoint
 membaca/menulis ke database asli.
 
+Untuk gambaran keseluruhan sistem (alur data ujung ke ujung, Docker Compose,
+istilah domain), baca [README root](../../README.md) lebih dulu.
+
+> ⚠️ **Belum ada autentikasi pada mayoritas endpoint.** Tidak ada dependency auth
+> global di `main.py` maupun `api/v1/api.py`. Seluruh route `/customers` dan
+> `/contracts` terbuka. `Depends(get_current_user)` hanya dipakai di beberapa
+> route AI Intelligence dan Restructuring Approval, dan di sana pun perannya
+> **audit trail**, bukan gate akses. Lihat [Batasan yang diketahui](#batasan-yang-diketahui).
+
 ## Arsitektur
 
 Satu arah dependency: **Router → Service → Repository (interface)**.
@@ -41,7 +50,13 @@ app/backend/
 
 Kalkulasi restrukturisasi (haircut, NPV, guardrail, dst) **tidak ada di
 backend ini** — itu murni ada di `app/shared/restructuring_offer_calculator.py`,
-dipakai bersama oleh backend dan pipeline ML lewat `RestructuringService`.
+dipakai bersama oleh backend dan pipeline ML lewat `RestructuringService`. Satu
+salinan saja, supaya batch ML dan API on-demand tidak bisa memberi angka berbeda
+untuk kontrak yang sama.
+
+Backend juga **tidak pernah membuat kontrak baru**. Ia hanya mencatat keputusan
+nasabah (`offer_status='ACCEPTED'`); yang mengeksekusinya menjadi kontrak baru
+adalah `app/core-banking/originator.py` — sistem terpisah, disengaja.
 
 ## Quick Start
 
@@ -187,6 +202,19 @@ Perhatikan `eligibility_tier` di response:
 - `MANUAL_REVIEW` — `offers` tetap terisi, tapi tunggu approval supervisor
 - `BLOCKED` — `offers` selalu kosong (data kontrak tidak valid)
 
+**`offers` juga bisa kosong walau tier-nya bukan `BLOCKED`** — itu artinya
+tawaran yang terhitung tidak lolos guardrail. Guardrail sekarang menguji **dua
+sisi**: sisi lender (NPV risk-adjusted membaik) dan sisi nasabah (cicilan baru
+wajib turun minimal `MIN_INSTALLMENT_REDUCTION_PCT`, total bayar tidak boleh
+melebihi `MAX_TOTAL_REPAYMENT_RATIO`). Tawaran yang tidak berupa keringanan nyata
+**tidak ditampilkan** — lebih baik tidak ada tawaran daripada tawaran yang pasti
+ditolak. Alasan penolakannya ada di `rejection_reasons`.
+
+Angka risk-adjusted yang ditampilkan memakai asumsi kenaikan peluang bayar
+pasca-restrukturisasi (`restructure_recovery_uplift_pct`) — asumsi yang sama
+dipakai batch ML, dibaca dari satu fungsi bersama supaya UI tidak menampilkan
+angka yang bertentangan dengan yang meloloskan tawaran itu.
+
 ### 10. Customer merespons tawaran (accept/reject)
 
 Ambil dulu `restructure_group_id` yang statusnya `OFFERED` (dari batch harian
@@ -265,12 +293,25 @@ task terpisah, belum digarap).
 
 ### 13. AI Intelligence — Sync (training-if-missing + scoring)
 
-Tombol "Sync" di halaman AI Intelligence: untuk tiap model type
-(`recovery`/`self_cure`/`roll_forward`/`ptp_success`) yang belum punya
-champion (dicek dari `app/machine-learning/models/registry.json`), latih dulu
-(subprocess `pipelines/train_*.py`), baru jalankan
-`pipelines/daily_scoring.py` (1x, menghasilkan ke-4 skor sekaligus). Berjalan
-di background thread — endpoint langsung `202`, poll status-nya.
+Tombol "Sync" di halaman AI Intelligence. Urutan langkahnya:
+
+1. Untuk tiap model type (`recovery`/`self_cure`/`roll_forward`/`ptp_success`)
+   yang **belum punya champion** (dicek dari
+   `app/machine-learning/models/registry.json`) — latih dulu lewat subprocess
+   `pipelines/train_*.py`.
+2. `pipelines/daily_scoring.py` — 1x saja, menghasilkan ke-4 skor sekaligus.
+3. `pipelines/weekly_mlops.py` — **selalu dijalankan**, bukan hanya saat training
+   dari nol. Script inilah satu-satunya penulis `model_monitoring_log` (sumber
+   kartu "Scoring Model Health" + hitungan drift). Drift dihitung dari hasil
+   scoring, jadi harus mengikuti setiap scoring baru; kalau langkah ini
+   dilewatkan, kartu health beku di angka run pertama.
+
+Berjalan di background thread — endpoint langsung `202`, poll status-nya.
+
+Tiap job yang selesai/gagal mencatat 1 baris `model_governance_audit_log`
+(`action='MODEL_SYNC'`, `performed_by='system (sync)'`, status sebenarnya di
+dalam `detail`), sehingga aktivitas Sync muncul di Operational Log. State
+in-memory tidak cukup untuk ini karena hilang setiap backend restart.
 
 ```bash
 # Mulai sync (butuh login — HANYA untuk syarat "logged-in user", tidak ada gate role)
@@ -293,7 +334,8 @@ curl http://localhost:8000/api/v1/ai-intelligence/sync/status
     {"model_type": "self_cure", "action": "train_then_score", "status": "running"},
     {"model_type": "roll_forward", "action": "train_then_score", "status": "pending"},
     {"model_type": "ptp_success", "action": "train_then_score", "status": "pending"},
-    {"model_type": "daily_scoring", "action": "score", "status": "pending"}
+    {"model_type": "daily_scoring", "action": "score", "status": "pending"},
+    {"model_type": "weekly_mlops", "action": "weekly_monitoring", "status": "pending"}
   ],
   "last_scored_at": "2026-07-26T23:10:04",
   "error": null
@@ -338,10 +380,51 @@ treat `401` sebagai sinyal logout, lihat `core/dependencies.py`).
 ## Testing
 
 ```bash
-pytest tests/ -v
+pytest tests/ -q       # 56 test
 ```
 
 Semua test jalan terhadap Postgres asli (bukan mock) — test yang butuh
 skenario spesifik (AUTO vs MANUAL_REVIEW, offer OFFERED) menyisipkan baris
 data throwaway lalu membersihkannya sendiri di teardown, jadi aman dijalankan
 berkali-kali tanpa mengganggu data lain di database dev.
+
+> ⚠️ **Dua jejak yang TIDAK dibersihkan** suite ini, diketahui dan berulang:
+> deskripsi di `model_governance_config.cbs_weights` tertimpa jadi `"d"`, dan
+> tersisa satu baris `model_governance_audit_log` dengan
+> `performed_by='test.smoke.governance'`. Kalau Anda peduli pada isi kedua tabel
+> itu, snapshot dulu sebelum menjalankan test, lalu restore setelahnya.
+
+## Batasan yang diketahui
+
+1. **Mayoritas endpoint tanpa autentikasi.** Tidak ada dependency auth global.
+   Route `/customers` dan `/contracts` — termasuk semua data nasabah — terbuka
+   tanpa token. Yang memakai `Depends(get_current_user)` hanya
+   `PUT /ai-intelligence/weighting-parameters`, `POST /ai-intelligence/sync`, dan
+   approve/reject di `/restructuring-groups`; ketiganya didokumentasikan sebagai
+   syarat "ada user yang login" untuk audit trail, **bukan** gate role.
+2. **Tidak ada RBAC.** Frontend menampilkan kelima menu ke setiap user yang login,
+   termasuk Restructuring Approval dan AI Intelligence.
+3. **`ai_reasoning` di `model_health` masih placeholder** (`available: false`
+   tanpa syarat) — tabel `ai_reasoning_output` belum dibangun. Desainnya ada di
+   `ai-reasoning-api-upgrade-tasks.md` (root repo) dan **belum siap
+   diimplementasikan apa adanya**; baca bagian koreksi audit di dokumen itu
+   sebelum mulai.
+4. **AUC di kartu Model Health baru terisi setelah ~30 hari** riwayat scoring —
+   itu AUC *live* (skor lampau vs pembayaran nyata sesudahnya), bukan AUC
+   cross-validation saat training. `NULL` di instalasi baru adalah perilaku benar,
+   dan sengaja tidak diganti angka training supaya tidak menyesatkan.
+5. **Tidak ada endpoint register publik.** User diprovisioning lewat
+   `scripts/seed_dev_user.py`.
+6. **Tidak ada refresh-token flow** — `JWT_EXPIRE_MINUTES` efektif adalah durasi
+   sesi sebelum user harus login ulang.
+7. **`ML_PYTHON_INTERPRETER` menentukan interpreter subprocess Sync.** Kalau
+   backend dan `app/machine-learning/` memakai venv berbeda, ini wajib diset —
+   kalau tidak, training akan gagal dengan `ModuleNotFoundError` yang membingungkan.
+8. **`helpers/database.py` di faker membaca env `PG*` sementara
+   `app/machine-learning/config/settings.py` juga menghormati `COLLECTAI_DB_URL`.**
+   Generator dan pipeline bisa menunjuk database berbeda kalau keduanya diset
+   tidak konsisten.
+9. **Quality check distribusi bersifat soft-fail secara default**
+   (`COLLECTAI_STRICT_QC=false`), jadi `POST /ai-intelligence/sync` tidak lagi
+   gagal hanya karena komposisi segmen bergeser. Pelanggaran tetap tercetak di
+   log subprocess. Aktifkan hard-fail dengan `COLLECTAI_STRICT_QC=true`.

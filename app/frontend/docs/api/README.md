@@ -2,7 +2,14 @@
 
 This folder documents every HTTP endpoint the CollectAI frontend (`app/frontend`) calls. It exists so a backend team can implement a real API against an already-agreed contract instead of guessing it from React code.
 
-**Status today:** no real backend exists yet. Every endpoint below is currently served by [MSW](https://mswjs.io/) fixtures in `src/mocks/`, which the frontend hits through the exact same `ky` + React Query code that will call a real server later. Switching from mock to real is a two-variable change — see [Switching from mock to a real backend](#switching-from-mock-to-a-real-backend) below.
+**Status today: the real backend now exists** — see [`app/backend/`](../../../backend/README.md). Every endpoint documented here is implemented against the shared Postgres database, and `app/frontend/.env.development` ships with `VITE_ENABLE_MSW=false`, so a local dev session talks to the real API by default.
+
+The [MSW](https://mswjs.io/) fixtures in `src/mocks/` are still maintained and still useful — set `VITE_ENABLE_MSW=true` to run the UI with no backend or database at all (this is what Docker Compose does by default). Because mock and real go through the exact same `ky` + React Query + Zod code, the fixtures also double as a live, readable example of every response shape below.
+
+Two things to keep in mind when reading the rest of this folder:
+
+- **The shapes below are the contract that is already live.** If a document here disagrees with the backend, the backend's OpenAPI schema at `http://localhost:8000/docs` is the source of truth — please fix the doc.
+- **Two modules described here as "new" are built:** Auth (`01-auth.md`) and Restructuring Approval (`09-restructuring-approval.md`). The "Backend status" column in the table below reflects the *original* build-priority assessment and is kept for historical context, not as current status.
 
 ## Modules
 
@@ -31,9 +38,21 @@ Read them in this order — it roughly matches build priority (clearest backend 
   - A backend is still free to return a descriptive JSON error body (e.g. `{ "message": "..." }`) for its own logs/tooling — the frontend just won't display it yet. If you want the frontend to show real backend error messages, that's a small, welcome follow-up (see the note in `01-auth.md`).
 - **Where the code lives** (same layout in every module): `src/domains/<module>/<module>.schema.ts` (Zod schemas + types), `src/domains/<module>/<module>.api.ts` (the actual `fetch` calls), `src/domains/<module>/use*Query.ts` / `use*Mutation.ts` (React Query hooks consumed by pages), `src/mocks/fixtures/<module>.fixtures.ts` + `src/mocks/handlers/<module>.handlers.ts` (the current mock implementation — useful as a live example of every shape below).
 
-## Switching from mock to a real backend
+## Switching between mock and the real backend
 
-Once real endpoints exist for a module, no frontend code needs to change — only configuration:
+No frontend code changes either way — only configuration:
+
+**Real backend (default in `.env.development`):**
+
+1. `VITE_ENABLE_MSW=false`.
+2. Leave `VITE_API_BASE_URL=/api`; the Vite dev proxy rewrites `/api` → `{VITE_API_PROXY_TARGET}/api/v1`, so the backend's version prefix stays out of application code. For a deployed build, point `VITE_API_BASE_URL` at the real API base URL instead.
+
+**Mock (no backend/database needed):**
+
+1. Set `VITE_ENABLE_MSW=true`.
+2. Note `auth.handlers.ts` is deliberately excluded from the handler aggregate, and MSW runs with `onUnhandledRequest: 'bypass'` — so `/auth/*` still falls through the proxy to the real backend. Running fully offline means login will fail unless you add those handlers back.
+
+**Historical note — the original mock-to-real checklist:**
 
 1. Set `VITE_API_BASE_URL` to the real API's base URL (e.g. in `.env.local` or `.env.production`).
 2. Set `VITE_ENABLE_MSW=false`.
