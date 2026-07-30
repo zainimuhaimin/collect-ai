@@ -47,7 +47,10 @@ services:
       # The bind mount above replaces the whole /app tree with host content, which
       # would hide the image's baked-in ./shared/ copy — remount it explicitly so
       # `from shared.restructuring_offer_calculator import ...` keeps resolving.
+      # Also mount app/machine-learning so backend sync background processes can
+      # inspect registry.json, run ML pipelines, and load models.
       - ./app/shared:/app/shared
+      - ./app/machine-learning:/app/machine-learning
     depends_on:
       db:
         condition: service_healthy
