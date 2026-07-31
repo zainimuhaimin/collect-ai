@@ -1,0 +1,33 @@
+{
+  "model_types": {
+    "recovery": {
+      "current_champion": {
+        "version": "v1",
+        "path": "/Users/mcdmobiledev11/Development/MCD/collect-ai/app/machine-learning/models/recovery_model_champion.pkl",
+        "role": "champion",
+        "model_type": "recovery",
+        "registered": "2026-07-30T20:59:29.093782",
+        "strategy": "recency_weighted",
+        "n_samples": 2918,
+        "auc": 0.8024,
+        "decay_rate": 0.7,
+        "trained_at": "2026-07-30T20:59:29.085392"
+      },
+      "current_challenger": null,
+      "history": [
+        {
+          "version": "v1",
+          "path": "/Users/mcdmobiledev11/Development/MCD/collect-ai/app/machine-learning/models/recovery_model_champion.pkl",
+          "role": "champion",
+          "model_type": "recovery",
+          "registered": "2026-07-30T20:59:29.093782",
+          "strategy": "recency_weighted",
+          "n_samples": 2918,
+          "auc": 0.8024,
+          "decay_rate": 0.7,
+          "trained_at": "2026-07-30T20:59:29.085392"
+        }
+      ]
+    }
+  }
+}

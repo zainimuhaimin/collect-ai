@@ -1,0 +1,2 @@
+run_at,reference_date,n_scored,wont_pay_pct,self_cure_pct,critical_pct,segment_breakdown,priority_breakdown
+2026-07-30T20:59:52.301794,2026-07-30,2817,0.3497,0.0,0.3717,"{'Can Pay': 1416, ""Won't Pay"": 985, 'Cannot Pay': 416}","{'Critical': 1047, 'Medium': 888, 'High': 577, 'Low': 305}"
