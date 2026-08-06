@@ -90,7 +90,9 @@ class CustomerListRow:
 @dataclass
 class CustomerProfile:
     """360 view 1 customer — join customer_master + customer_behavioral_standing
-    + kontrak utama (primary contract) + skor ai_intelligence_output kontrak itu."""
+    + kontrak utama (primary contract) untuk skor ai_intelligence_output.
+    outstanding_balance TIDAK ikut definisi "kontrak utama" itu — nilainya
+    SUM dari SEMUA kontrak aktif customer ini."""
     cust_id: str
     name: str
     outstanding_balance: float

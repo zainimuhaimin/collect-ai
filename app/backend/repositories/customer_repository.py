@@ -255,6 +255,11 @@ class CustomerRepository(ICustomerRepository):
         return [_row_to_customer_list_row(r) for r in rows], int(total)
 
     def get_customer_profile(self, cust_id: str) -> Optional[CustomerProfile]:
+        # outstanding_balance HARUS total dari SEMUA kontrak aktif (SUM lewat
+        # `ots`), bukan cuma kontrak dengan OTS terbesar — `pc` di bawah tetap
+        # dipertahankan hanya untuk memilih kontrak mana yang jadi acuan skor
+        # ai_intelligence_output (risk_segment/recovery_score/dst tetap level
+        # 1 kontrak "utama", beda concern dari total outstanding).
         query = """
             SELECT
                 cm.cust_id,
@@ -263,7 +268,7 @@ class CustomerRepository(ICustomerRepository):
                 cbs.restructure_count,
                 cbs.active_contract_count,
                 cbs.behavioral_grade,
-                pc.total_ots,
+                ots.total_ots,
                 ai.risk_segment,
                 ai.recovery_score,
                 ai.self_cure_probability,
@@ -273,7 +278,12 @@ class CustomerRepository(ICustomerRepository):
             FROM customer_master cm
             LEFT JOIN customer_behavioral_standing cbs ON cbs.cust_id = cm.cust_id
             LEFT JOIN LATERAL (
-                SELECT contract_no, (COALESCE(prnc_ots, 0) + COALESCE(intr_ots, 0)) AS total_ots
+                SELECT COALESCE(SUM(COALESCE(prnc_ots, 0) + COALESCE(intr_ots, 0)), 0) AS total_ots
+                FROM contract_snapshot
+                WHERE cust_id = cm.cust_id AND COALESCE(closed_via_restructure, FALSE) = FALSE
+            ) ots ON TRUE
+            LEFT JOIN LATERAL (
+                SELECT contract_no
                 FROM contract_snapshot
                 WHERE cust_id = cm.cust_id AND COALESCE(closed_via_restructure, FALSE) = FALSE
                 ORDER BY (COALESCE(prnc_ots, 0) + COALESCE(intr_ots, 0)) DESC

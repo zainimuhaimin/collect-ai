@@ -101,7 +101,7 @@ class CustomerProfileSchema(BaseModel):
     cust_id: str
     name: str
     initials: str = Field(description="Dihitung dari `name` — lihat core/text_utils.py:compute_initials()")
-    outstanding_balance: str = Field(description="Total OTS kontrak utama, format 'Rp N'")
+    outstanding_balance: str = Field(description="Total OTS di-SUM dari SEMUA kontrak aktif customer, format 'Rp N'")
     risk_segment: Optional[str] = Field(description="Nilai APA ADANYA dari ai_intelligence_output, TIDAK diterjemahkan")
     risk_score: int = Field(description="recovery_score * 100, dibulatkan (0-100)")
     recovery_score: float
