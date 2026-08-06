@@ -1,0 +1,212 @@
+# ═════════════════════════════════════════════════════════════════════════════
+# CollectAI — nginx: menyajikan bundle React (SPA) + reverse proxy & load
+# balancer ke app/backend, dengan rate limiting pendekatan EMBER BOCOR.
+#
+# File ini adalah TEMPLATE. Image nginx resmi menjalankan `envsubst` ke semua
+# file /etc/nginx/templates/*.template saat container start, hasilnya ditulis
+# ke /etc/nginx/conf.d/default.conf. Hanya ${SERVER_NAME} yang disubstitusi
+# (dibatasi NGINX_ENVSUBST_FILTER di docker-compose.yml) — variabel nginx
+# seperti $uri, $host, $binary_remote_addr TIDAK ikut tersubstitusi.
+#
+# Blok map/upstream/limit_req_zone di bawah valid di sini karena conf.d/ memang
+# di-include dari dalam blok http {} milik nginx.conf bawaan image.
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+# ── 1. LOAD BALANCER ─────────────────────────────────────────────────────────
+# "be" adalah nama service di docker-compose. Saat di-scale (replicas), Docker
+# DNS mengembalikan SEMUA alamat IP replika untuk nama itu, dan nginx membuat
+# satu peer per IP -> load balancing beneran lintas replika.
+#
+# least_conn dipilih (bukan round-robin default) karena durasi request ke
+# backend ini tidak seragam: /dashboard/summary (agregasi berat) jauh lebih lama
+# daripada /auth/me. Round-robin akan tetap mengirim request baru ke replika
+# yang sedang sibuk; least_conn mengirim ke yang koneksi aktifnya paling sedikit.
+#
+# CATATAN OPERASIONAL: nginx OSS me-resolve "be" SEKALI saat start. Kalau ada
+# replika restart dan dapat IP baru, nginx masih memakai IP lama sampai
+# di-reload (`docker compose restart frontend`). Untuk stack dev ini bisa
+# diterima; untuk produksi pakai service discovery atau nginx Plus (`resolve`).
+upstream collectai_backend {
+    least_conn;
+
+    server be:8000 max_fails=3 fail_timeout=10s;
+
+    # Pool koneksi persisten ke backend — menghindari TCP handshake tiap request.
+    # Wajib dibarengi `proxy_http_version 1.1` + `proxy_set_header Connection ""`.
+    keepalive 32;
+}
+
+
+# ── 2. EMBER BOCOR (LEAKY BUCKET) ────────────────────────────────────────────
+# Analoginya: tiap IP punya satu ember. Request yang masuk = air yang dituang.
+# Ember punya lubang di bawah yang mengalirkan air pada laju TETAP (`rate`).
+#
+#   rate   = besar lubang    -> laju request diteruskan ke backend, konstan
+#   burst  = kapasitas ember -> berapa request boleh mengantre saat air deras
+#   (tanpa `nodelay`)        -> request berlebih DITAHAN & dilepas pelan-pelan
+#
+# Kunci "ember bocor" ada pada TIDAK dipakainya opsi `nodelay`:
+#   - TANPA nodelay (dipakai di sini) = ember bocor murni. Kelebihan request
+#     diantrekan lalu diteruskan pada laju konstan. Trafik ke backend jadi rata.
+#   - DENGAN nodelay = perilaku token bucket. Antrean langsung diteruskan
+#     serentak, jadi backend tetap bisa kena lonjakan mendadak.
+# Kalau ember sudah penuh (melebihi burst), request baru langsung ditolak 429.
+#
+# 10m = ukuran shared memory penyimpan state per IP (~160.000 IP per 10 MB).
+limit_req_zone  $binary_remote_addr  zone=api_leaky:10m   rate=10r/s;
+
+# Ember terpisah & jauh lebih sempit khusus login: melindungi dari brute force
+# tanpa ikut mencekik trafik API normal (dashboard menembak banyak request
+# sekaligus saat halaman dibuka).
+limit_req_zone  $binary_remote_addr  zone=auth_leaky:10m  rate=1r/s;
+
+# Batas jumlah koneksi bersamaan per IP — pelengkap rate limit di atas.
+limit_conn_zone $binary_remote_addr  zone=conn_per_ip:10m;
+
+# 429 Too Many Requests lebih tepat secara semantik daripada default 503.
+limit_req_status  429;
+limit_conn_status 429;
+limit_req_log_level warn;
+
+
+# ── 3. CACHE-CONTROL PER JENIS ASET ──────────────────────────────────────────
+# Dipetakan lewat `map` (bukan add_header per-location) karena di nginx,
+# begitu sebuah location punya add_header sendiri, SEMUA add_header dari level
+# server tidak lagi diwarisi — header keamanan di bawah akan hilang diam-diam
+# pada location tersebut. Dengan map, cukup satu add_header di level server.
+# Nilai string kosong = header tidak ditambahkan sama sekali (mis. respons API,
+# biar tidak bentrok dengan Cache-Control yang mungkin dikirim backend).
+map $uri $collectai_cache_control {
+    default             "";
+    "~^/assets/"        "public, max-age=31536000, immutable";
+    "~^/index\.html$"   "no-store, must-revalidate";
+}
+
+
+# ── 4. SERVER ────────────────────────────────────────────────────────────────
+server {
+    listen      80;
+    listen      [::]:80;
+
+    # Diisi dari env SERVER_NAME (lihat docker-compose.yml). Untuk produksi
+    # set ke domain asli, mis. SERVER_NAME=collectai.example.com
+    server_name ${SERVER_NAME};
+
+    root  /usr/share/nginx/html;
+    index index.html;
+
+    # Jangan bocorkan versi nginx di header/error page.
+    server_tokens off;
+
+    # Batas ukuran body — endpoint saat ini semuanya JSON kecil.
+    client_max_body_size 2m;
+
+    # Header keamanan + cache. Semua di level server supaya berlaku seragam;
+    # tidak ada satu pun location di bawah yang memakai add_header sendiri
+    # (lihat penjelasan pada blok map di atas).
+    add_header X-Content-Type-Options nosniff                   always;
+    add_header X-Frame-Options        SAMEORIGIN                always;
+    add_header Referrer-Policy        strict-origin-when-cross-origin always;
+    add_header Cache-Control          $collectai_cache_control  always;
+
+    gzip              on;
+    gzip_vary         on;
+    gzip_min_length   1024;
+    gzip_proxied      any;
+    gzip_types        text/plain text/css application/json application/javascript
+                      application/x-javascript text/xml application/xml image/svg+xml;
+
+    # Setelan proxy yang diwarisi semua location di bawah.
+    proxy_http_version 1.1;
+    proxy_set_header   Host              $host;
+    proxy_set_header   X-Real-IP         $remote_addr;
+    proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header   X-Forwarded-Proto $scheme;
+    proxy_set_header   Connection        "";   # wajib agar keepalive upstream jalan
+    proxy_connect_timeout 5s;
+    proxy_send_timeout    60s;
+    proxy_read_timeout    60s;
+    # Kalau satu replika mati/menolak, coba replika berikutnya (bukan langsung 502).
+    proxy_next_upstream       error timeout http_502 http_503 http_504;
+    proxy_next_upstream_tries 2;
+
+    # ── Health check untuk container ini sendiri ─────────────────────────────
+    location = /healthz {
+        access_log off;
+        return 200 "ok\n";
+    }
+
+    # ── Login: ember paling sempit (anti brute force) ────────────────────────
+    # nginx memprioritaskan exact match (`=`) di atas prefix match, jadi blok
+    # ini tetap menang atas `location /api/` di bawahnya.
+    location = /api/auth/login {
+        limit_req  zone=auth_leaky burst=5;
+        limit_conn conn_per_ip 10;
+
+        # Frontend memanggil /api/... sedangkan backend menyajikan di /api/v1/...
+        # URI ditulis eksplisit di proxy_pass -> menggantikan path yang match.
+        proxy_pass http://collectai_backend/api/v1/auth/login;
+    }
+
+    # ── Seluruh API lain ─────────────────────────────────────────────────────
+    location /api/ {
+        limit_req  zone=api_leaky burst=20;
+        limit_conn conn_per_ip 20;
+
+        # Trailing slash di kedua sisi: prefix "/api/" yang match diganti
+        # "/api/v1/", jadi /api/customers -> /api/v1/customers.
+        proxy_pass http://collectai_backend/api/v1/;
+    }
+
+    # ── SPA fallback ─────────────────────────────────────────────────────────
+    # Route sisi klien (/dashboard, /customers/123, dst) tidak punya file fisik,
+    # jadi semua diarahkan ke index.html biar React Router yang menangani.
+    # Aset ber-hash di /assets/ ikut ter-handle di sini (ketemu sebagai file),
+    # cache header-nya diatur lewat map di atas.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# CATATAN UNTUK DEPLOY KE DOMAIN ASLI
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# 1) Arahkan DNS: buat A record domain Anda -> IP publik server ini, lalu set
+#    SERVER_NAME=domain-anda.com di .env root (dipakai blok server di atas),
+#    dan pastikan port 80/443 ter-publish di docker-compose.yml.
+#
+# 2) HTTPS. Blok di bawah sengaja DIKOMENTARI supaya container tetap bisa start
+#    tanpa file sertifikat. Terbitkan sertifikat dulu (mis. certbot/Let's
+#    Encrypt), mount ke container, baru buka komentarnya:
+#
+#    server {
+#        listen 443 ssl;
+#        listen [::]:443 ssl;
+#        http2 on;
+#        server_name ${SERVER_NAME};
+#
+#        ssl_certificate     /etc/letsencrypt/live/${SERVER_NAME}/fullchain.pem;
+#        ssl_certificate_key /etc/letsencrypt/live/${SERVER_NAME}/privkey.pem;
+#        ssl_protocols       TLSv1.2 TLSv1.3;
+#        ssl_ciphers         HIGH:!aNULL:!MD5;
+#        ssl_session_cache   shared:SSL:10m;
+#
+#        # ... salin seluruh isi blok server :80 di atas ke sini ...
+#    }
+#
+#    Lalu ubah blok :80 menjadi redirect saja:
+#        location / { return 301 https://$host$request_uri; }
+#    (kecuali /.well-known/acme-challenge/ yang harus tetap dilayani via HTTP
+#    supaya perpanjangan sertifikat certbot tidak gagal).
+#
+# 3) Kalau nginx ini berada DI BELAKANG proxy/CDN lain (Cloudflare, ALB, dsb),
+#    $binary_remote_addr akan berisi IP proxy — bukan IP pengunjung — sehingga
+#    SEMUA pengunjung berbagi satu ember yang sama. Aktifkan real_ip agar rate
+#    limit dihitung per pengunjung asli:
+#
+#        set_real_ip_from  10.0.0.0/8;      # ganti dengan CIDR proxy Anda
+#        real_ip_header    X-Forwarded-For;
+#        real_ip_recursive on;
