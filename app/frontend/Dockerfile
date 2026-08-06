@@ -35,6 +35,14 @@ FROM nginx:1.27-alpine
 # (mengisi ${SERVER_NAME}) lalu menulis hasilnya ke conf.d/default.conf.
 COPY nginx/nginx.conf.template /etc/nginx/templates/default.conf.template
 
+# Isi blok server yang dipakai bersama listener :80 dan :443.
+COPY nginx/snippets/ /etc/nginx/snippets/
+
+# CATATAN: nginx/tls.conf.template SENGAJA tidak di-COPY ke sini. Kalau ikut
+# masuk ke templates/, nginx akan selalu mencari file sertifikat dan gagal
+# start di environment yang tidak punya (mis. laptop). File itu di-bind-mount
+# saat dibutuhkan lewat docker-compose.prod.yml.
+
 # Hanya artefak hasil build yang ikut — tanpa node_modules, tanpa source.
 COPY --from=build /app/dist /usr/share/nginx/html
 

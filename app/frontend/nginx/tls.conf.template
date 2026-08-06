@@ -1,0 +1,41 @@
+# ═════════════════════════════════════════════════════════════════════════════
+# Listener HTTPS (:443) untuk origin.
+#
+# File ini SENGAJA TIDAK ikut di-COPY ke dalam image (lihat app/frontend/
+# Dockerfile). Alasannya: nginx menolak start kalau `ssl_certificate` menunjuk
+# ke file yang tidak ada — kalau file ini selalu aktif, stack lokal (yang tidak
+# punya sertifikat) langsung mati.
+#
+# Diaktifkan hanya lewat docker-compose.prod.yml, yang mem-bind-mount:
+#   - file ini            -> /etc/nginx/templates/tls.conf.template
+#   - sertifikat & kunci  -> /etc/nginx/certs/
+#
+# upstream, limit_req_zone, dan map TIDAK didefinisikan ulang di sini — semuanya
+# sudah ada di default.conf (hasil nginx.conf.template), yang di-include lebih
+# dulu secara alfabetis dan berada di blok http yang sama.
+# ═════════════════════════════════════════════════════════════════════════════
+
+server {
+    listen      443 ssl;
+    listen      [::]:443 ssl;
+    http2       on;
+
+    server_name ${SERVER_NAME};
+
+    # Untuk Cloudflare mode Full / Full (strict), cara paling praktis adalah
+    # Cloudflare Origin Certificate (gratis, berlaku 15 tahun, dipercaya
+    # Cloudflare) — bukan Let's Encrypt, karena tidak perlu perpanjangan
+    # tiap 90 hari dan tidak perlu port 80 terbuka untuk ACME challenge.
+    #   Cloudflare Dashboard > SSL/TLS > Origin Server > Create Certificate
+    ssl_certificate     /etc/nginx/certs/origin.pem;
+    ssl_certificate_key /etc/nginx/certs/origin.key;
+
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    include /etc/nginx/snippets/app.conf;
+}

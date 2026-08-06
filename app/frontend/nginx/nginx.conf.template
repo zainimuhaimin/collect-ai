@@ -9,7 +9,12 @@
 # seperti $uri, $host, $binary_remote_addr TIDAK ikut tersubstitusi.
 #
 # Blok map/upstream/limit_req_zone di bawah valid di sini karena conf.d/ memang
-# di-include dari dalam blok http {} milik nginx.conf bawaan image.
+# di-include dari dalam blok http {} milik nginx.conf bawaan image. Ketiganya
+# didefinisikan SEKALI di file ini dan ikut dipakai oleh tls.conf (HTTPS),
+# yang di-include belakangan secara alfabetis.
+#
+# Isi blok server-nya ada di snippets/app.conf — dipakai bersama oleh listener
+# :80 di sini dan :443 di tls.conf.template.
 # ═════════════════════════════════════════════════════════════════════════════
 
 
@@ -54,6 +59,10 @@ upstream collectai_backend {
 # Kalau ember sudah penuh (melebihi burst), request baru langsung ditolak 429.
 #
 # 10m = ukuran shared memory penyimpan state per IP (~160.000 IP per 10 MB).
+#
+# ⚠ DI BELAKANG CLOUDFLARE/CDN: aktifkan blok real_ip di bagian bawah file ini,
+#   kalau tidak $binary_remote_addr akan berisi IP Cloudflare dan SEMUA
+#   pengunjung berbagi satu ember yang sama.
 limit_req_zone  $binary_remote_addr  zone=api_leaky:10m   rate=10r/s;
 
 # Ember terpisah & jauh lebih sempit khusus login: melindungi dari brute force
@@ -73,8 +82,8 @@ limit_req_log_level warn;
 # ── 3. CACHE-CONTROL PER JENIS ASET ──────────────────────────────────────────
 # Dipetakan lewat `map` (bukan add_header per-location) karena di nginx,
 # begitu sebuah location punya add_header sendiri, SEMUA add_header dari level
-# server tidak lagi diwarisi — header keamanan di bawah akan hilang diam-diam
-# pada location tersebut. Dengan map, cukup satu add_header di level server.
+# server tidak lagi diwarisi — header keamanan akan hilang diam-diam pada
+# location tersebut. Dengan map, cukup satu add_header di level server.
 # Nilai string kosong = header tidak ditambahkan sama sekali (mis. respons API,
 # biar tidak bentrok dengan Cache-Control yang mungkin dikirim backend).
 map $uri $collectai_cache_control {
@@ -84,7 +93,8 @@ map $uri $collectai_cache_control {
 }
 
 
-# ── 4. SERVER ────────────────────────────────────────────────────────────────
+# ── 4. SERVER (HTTP :80) ─────────────────────────────────────────────────────
+# Untuk HTTPS, lihat tls.conf.template — di-enable lewat docker-compose.prod.yml.
 server {
     listen      80;
     listen      [::]:80;
@@ -93,120 +103,30 @@ server {
     # set ke domain asli, mis. SERVER_NAME=collectai.example.com
     server_name ${SERVER_NAME};
 
-    root  /usr/share/nginx/html;
-    index index.html;
-
-    # Jangan bocorkan versi nginx di header/error page.
-    server_tokens off;
-
-    # Batas ukuran body — endpoint saat ini semuanya JSON kecil.
-    client_max_body_size 2m;
-
-    # Header keamanan + cache. Semua di level server supaya berlaku seragam;
-    # tidak ada satu pun location di bawah yang memakai add_header sendiri
-    # (lihat penjelasan pada blok map di atas).
-    add_header X-Content-Type-Options nosniff                   always;
-    add_header X-Frame-Options        SAMEORIGIN                always;
-    add_header Referrer-Policy        strict-origin-when-cross-origin always;
-    add_header Cache-Control          $collectai_cache_control  always;
-
-    gzip              on;
-    gzip_vary         on;
-    gzip_min_length   1024;
-    gzip_proxied      any;
-    gzip_types        text/plain text/css application/json application/javascript
-                      application/x-javascript text/xml application/xml image/svg+xml;
-
-    # Setelan proxy yang diwarisi semua location di bawah.
-    proxy_http_version 1.1;
-    proxy_set_header   Host              $host;
-    proxy_set_header   X-Real-IP         $remote_addr;
-    proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
-    proxy_set_header   X-Forwarded-Proto $scheme;
-    proxy_set_header   Connection        "";   # wajib agar keepalive upstream jalan
-    proxy_connect_timeout 5s;
-    proxy_send_timeout    60s;
-    proxy_read_timeout    60s;
-    # Kalau satu replika mati/menolak, coba replika berikutnya (bukan langsung 502).
-    proxy_next_upstream       error timeout http_502 http_503 http_504;
-    proxy_next_upstream_tries 2;
-
-    # ── Health check untuk container ini sendiri ─────────────────────────────
-    location = /healthz {
-        access_log off;
-        return 200 "ok\n";
-    }
-
-    # ── Login: ember paling sempit (anti brute force) ────────────────────────
-    # nginx memprioritaskan exact match (`=`) di atas prefix match, jadi blok
-    # ini tetap menang atas `location /api/` di bawahnya.
-    location = /api/auth/login {
-        limit_req  zone=auth_leaky burst=5;
-        limit_conn conn_per_ip 10;
-
-        # Frontend memanggil /api/... sedangkan backend menyajikan di /api/v1/...
-        # URI ditulis eksplisit di proxy_pass -> menggantikan path yang match.
-        proxy_pass http://collectai_backend/api/v1/auth/login;
-    }
-
-    # ── Seluruh API lain ─────────────────────────────────────────────────────
-    location /api/ {
-        limit_req  zone=api_leaky burst=20;
-        limit_conn conn_per_ip 20;
-
-        # Trailing slash di kedua sisi: prefix "/api/" yang match diganti
-        # "/api/v1/", jadi /api/customers -> /api/v1/customers.
-        proxy_pass http://collectai_backend/api/v1/;
-    }
-
-    # ── SPA fallback ─────────────────────────────────────────────────────────
-    # Route sisi klien (/dashboard, /customers/123, dst) tidak punya file fisik,
-    # jadi semua diarahkan ke index.html biar React Router yang menangani.
-    # Aset ber-hash di /assets/ ikut ter-handle di sini (ketemu sebagai file),
-    # cache header-nya diatur lewat map di atas.
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
+    include /etc/nginx/snippets/app.conf;
 }
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# CATATAN UNTUK DEPLOY KE DOMAIN ASLI
+# CATATAN: DI BELAKANG CLOUDFLARE (atau CDN/LB lain)
 # ═════════════════════════════════════════════════════════════════════════════
 #
-# 1) Arahkan DNS: buat A record domain Anda -> IP publik server ini, lalu set
-#    SERVER_NAME=domain-anda.com di .env root (dipakai blok server di atas),
-#    dan pastikan port 80/443 ter-publish di docker-compose.yml.
+# Kalau proxy Cloudflare aktif (awan oranye), $binary_remote_addr berisi IP
+# Cloudflare — bukan IP pengunjung — sehingga SELURUH pengunjung berbagi satu
+# ember bocor yang sama. Ember login (1r/s) akan mencekik semua orang begitu
+# ada beberapa user login berbarengan.
 #
-# 2) HTTPS. Blok di bawah sengaja DIKOMENTARI supaya container tetap bisa start
-#    tanpa file sertifikat. Terbitkan sertifikat dulu (mis. certbot/Let's
-#    Encrypt), mount ke container, baru buka komentarnya:
+# Perbaikannya: aktifkan real_ip supaya nginx memakai IP asli dari header
+# CF-Connecting-IP. Ambil daftar CIDR terbaru dari cloudflare.com/ips-v4 dan
+# cloudflare.com/ips-v6 (JANGAN hardcode dari ingatan — daftarnya berubah),
+# lalu taruh di file terpisah dan include di sini:
 #
-#    server {
-#        listen 443 ssl;
-#        listen [::]:443 ssl;
-#        http2 on;
-#        server_name ${SERVER_NAME};
+#     include /etc/nginx/snippets/cloudflare-real-ip.conf;
 #
-#        ssl_certificate     /etc/letsencrypt/live/${SERVER_NAME}/fullchain.pem;
-#        ssl_certificate_key /etc/letsencrypt/live/${SERVER_NAME}/privkey.pem;
-#        ssl_protocols       TLSv1.2 TLSv1.3;
-#        ssl_ciphers         HIGH:!aNULL:!MD5;
-#        ssl_session_cache   shared:SSL:10m;
+# Isi file tersebut kira-kira:
+#     set_real_ip_from 173.245.48.0/20;   # ... dst, semua CIDR Cloudflare
+#     real_ip_header   CF-Connecting-IP;  # header khusus Cloudflare
 #
-#        # ... salin seluruh isi blok server :80 di atas ke sini ...
-#    }
-#
-#    Lalu ubah blok :80 menjadi redirect saja:
-#        location / { return 301 https://$host$request_uri; }
-#    (kecuali /.well-known/acme-challenge/ yang harus tetap dilayani via HTTP
-#    supaya perpanjangan sertifikat certbot tidak gagal).
-#
-# 3) Kalau nginx ini berada DI BELAKANG proxy/CDN lain (Cloudflare, ALB, dsb),
-#    $binary_remote_addr akan berisi IP proxy — bukan IP pengunjung — sehingga
-#    SEMUA pengunjung berbagi satu ember yang sama. Aktifkan real_ip agar rate
-#    limit dihitung per pengunjung asli:
-#
-#        set_real_ip_from  10.0.0.0/8;      # ganti dengan CIDR proxy Anda
-#        real_ip_header    X-Forwarded-For;
-#        real_ip_recursive on;
+# Catatan: pakai CF-Connecting-IP (bukan X-Forwarded-For) karena Cloudflare
+# selalu mengisinya dengan satu IP pengunjung asli, sehingga tidak bisa
+# dipalsukan lewat header X-Forwarded-For yang dikirim klien.

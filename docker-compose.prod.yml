@@ -1,0 +1,40 @@
+# Override untuk deploy di server (di belakang Cloudflare mode Full).
+#
+# Pakai bareng file utama, JANGAN sendirian:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Yang diubah dibanding docker-compose.yml:
+#   1. Membuka :443 dan mengaktifkan blok TLS (tls.conf.template + sertifikat).
+#   2. Port backend & Postgres TIDAK lagi di-publish ke publik — hanya nginx
+#      yang menghadap internet. Antar container tetap bisa saling akses lewat
+#      network internal compose, jadi tidak ada yang rusak.
+#   3. uvicorn --reload dimatikan (lihat catatan di service `be`).
+#
+# PRASYARAT: taruh Cloudflare Origin Certificate di server sebagai
+#   ./certs/origin.pem  dan  ./certs/origin.key
+# (buat di Cloudflare Dashboard > SSL/TLS > Origin Server > Create Certificate)
+
+services:
+  db:
+    # Postgres tidak boleh menghadap internet. Dihapus dari publikasi port —
+    # service `be` tetap menjangkaunya via nama host "db" di network compose.
+    ports: !reset []
+
+  be:
+    # Backend hanya diakses nginx dari dalam network, tidak perlu port host.
+    # Untuk debugging sementara: docker compose exec be curl localhost:8000/
+    ports: !reset []
+    # --reload memantau perubahan file dan tidak dibutuhkan di server; mematikannya
+    # menghemat CPU/memori, apalagi dikali jumlah replika.
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  frontend:
+    ports:
+      - "${FRONTEND_HTTP_PORT:-80}:80"
+      - "${FRONTEND_HTTPS_PORT:-443}:443"
+    volumes:
+      # Mengaktifkan listener :443 — file ini sengaja tidak ada di dalam image
+      # supaya stack lokal (tanpa sertifikat) tetap bisa start.
+      - ./app/frontend/nginx/tls.conf.template:/etc/nginx/templates/tls.conf.template:ro
+      # Sertifikat Cloudflare Origin CA.
+      - ./certs:/etc/nginx/certs:ro

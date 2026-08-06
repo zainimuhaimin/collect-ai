@@ -8,3 +8,7 @@ venv
 .claude
 .env
 __pycache__
+# Sertifikat TLS origin (berisi private key) — JANGAN pernah di-commit
+certs/
+*.pem
+*.key
