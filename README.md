@@ -259,6 +259,8 @@ collect-ai/
 │                                 #   seluruh schema app/machine-learning/ + app/backend/
 ├── init_table.sql                # DDL 4 tabel input versi paling awal (historis,
 │                                 #   TIDAK dipakai lagi — pakai schema.sql)
+├── scripts/
+│   └── reset-demo.sh             #   reset TOTAL (DB + model artifact + log) untuk demo/testing
 ├── *.md                          # dokumen desain per fitur — lihat "Peta dokumentasi"
 │
 ├── app/
@@ -343,6 +345,12 @@ ada, kolomnya `NULL` dan scoring tetap jalan.
 ## Tugas-tugas umum
 
 ```bash
+# Reset TOTAL untuk demo/testing dari awal — TRUNCATE semua tabel data (kecuali
+# `users`), hapus seluruh models/*.json + *.pkl, hapus logs/scoring_log.csv.
+# Interaktif (minta konfirmasi 'yes'); --yes untuk skip, --include-users untuk
+# ikut mengosongkan tabel login juga.
+./scripts/reset-demo.sh
+
 # Regenerasi ulang seluruh data sintetis (menghapus data lama + tabel derivatif)
 cd faker && python generate-faker-realistic.py --reset
 
