@@ -1,4 +1,4 @@
-export type ChipTone = 'critical' | 'high' | 'medium' | 'success' | 'danger' | 'neutral' | 'positive';
+export type ChipTone = 'critical' | 'high' | 'warning' | 'medium' | 'success' | 'danger' | 'neutral' | 'positive';
 
 interface ChipProps {
   readonly children: React.ReactNode;
@@ -7,7 +7,10 @@ interface ChipProps {
 
 const TONE_CLASSES: Record<ChipTone, string> = {
   critical: 'bg-error-container text-on-error-container dark:bg-error/20 dark:text-error-container',
-  high: 'bg-error-container text-on-error-container dark:bg-error/20 dark:text-error-container',
+  // Distinct from `critical` so a 4-level urgency ladder (LOW/MEDIUM/HIGH/CRITICAL,
+  // see AiReasoningCard) doesn't render HIGH and CRITICAL identically.
+  high: 'bg-warning-container text-on-warning-container dark:bg-warning/20 dark:text-warning-container',
+  warning: 'bg-warning-container text-on-warning-container dark:bg-warning/20 dark:text-warning-container',
   medium: 'bg-surface-container-high text-on-surface-variant dark:bg-surface-container-high/20 dark:text-surface-variant',
   success: 'bg-success-container text-on-success-container dark:bg-success/20 dark:text-success-container',
   danger: 'bg-error-container text-on-error-container dark:bg-error/20 dark:text-error-container',

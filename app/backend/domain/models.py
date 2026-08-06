@@ -131,6 +131,11 @@ class AiScoringSnapshot:
     nba_recommendation: Optional[str]
     confidence_level: float
     scoring_date: Optional[date]
+    # Label singkat cabang apply_nba() (business_rules.py) yang menghasilkan
+    # nba_recommendation di atas, mis. "override:collection_sensitivity" —
+    # dipakai fitur AI Reasoning supaya LLM tahu ALASAN rekomendasi tanpa
+    # merekonstruksi ulang logika last-write-wins-nya (lihat schema_v5.sql).
+    nba_trigger: Optional[str] = None
 
 
 @dataclass
@@ -307,3 +312,65 @@ class SyncJobState:
     # perlu menjalankan pipelines/weekly_mlops.py tambahan setelah daily_scoring
     # (lihat AiIntelligenceSyncService, Round 4 #8).
     did_train_from_scratch: bool = False
+
+
+# ── AI Reasoning (ai-reasoning-api-upgrade-tasks.md) — grain DEBITUR ────────
+
+
+@dataclass
+class CustomerBehavioralRaw:
+    """customer_behavioral_standing APA ADANYA — TIDAK meng-coalesce NULL ke
+    0/default seperti CustomerProfile/Customer di atas. Payload AI Reasoning
+    butuh membedakan "tidak ada data" dari "nol" (temuan #9/#16
+    ai-reasoning-api-upgrade-tasks.md): debitur baru tanpa baris CBS harus
+    terlihat sebagai TIDAK ADA data, bukan diam-diam ter-grade 'D'."""
+    cust_id: str
+    has_cbs_row: bool          # False = belum pernah dibangun untuk cust_id ini
+    behavioral_grade: Optional[str]
+    ptp_reliability_index: Optional[float]
+    collection_sensitivity: Optional[str]
+    b_list_status: Optional[str]
+    active_contract_count: int
+    total_active_ots: float
+    cbs_as_of: Optional[datetime]     # customer_behavioral_standing.update_timestamp
+
+
+@dataclass
+class AiReasoningHealthSnapshot:
+    """Agregat ai_reasoning_output 7 hari terakhir — dipakai mengganti
+    AiReasoningHealthPlaceholder di kartu Model Health (halaman AI
+    Intelligence) begitu tabelnya ada isinya."""
+    last_generated_at: Optional[datetime]
+    total_7d: int
+    success_rate_7d: Optional[float]   # None kalau total_7d == 0
+
+
+@dataclass
+class AiReasoningRecord:
+    """1 baris ai_reasoning_output — hasil (atau status kegagalan/kekurangan
+    data) analisa hyper-personalization 1 debitur. `status` menentukan field
+    mana yang terisi: OK/FALLBACK mengisi summary dst, INSUFFICIENT_DATA hanya
+    mengisi insufficient_reason, FAILED hanya mengisi error_code."""
+    cust_id: str
+    source_signature: str
+    prompt_version: str
+    status: str    # OK | FALLBACK | FAILED | RUNNING | INSUFFICIENT_DATA
+    insufficient_reason: Optional[str] = None
+    model_used: Optional[str] = None
+    generated_at: Optional[datetime] = None
+    summary: Optional[str] = None
+    customer_treatment_strategy: Optional[str] = None
+    key_factors: List[str] = field(default_factory=list)
+    primary_nba_action: Optional[str] = None
+    primary_nba_rationale: Optional[str] = None
+    nba_agreement: Optional[str] = None    # AGREE | DIFFER
+    per_contract_focus: List[Dict] = field(default_factory=list)
+    consistency_note: Optional[str] = None
+    analyzed_contract_nos: List[str] = field(default_factory=list)
+    latency_ms: Optional[int] = None
+    prompt_tokens: Optional[int] = None
+    completion_tokens: Optional[int] = None
+    total_tokens: Optional[int] = None
+    error_code: Optional[str] = None
+    payload_bytes: Optional[int] = None
+    created_at: Optional[datetime] = None

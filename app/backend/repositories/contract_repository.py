@@ -151,6 +151,113 @@ def _row_to_contract_list_row(row) -> ContractListRow:
     )
 
 
+_CONTRACT_DETAIL_SELECT = """
+    SELECT
+        cs.contract_no, cs.cust_id, cs.product_type, cs.cycle, cs.prev_cycle,
+        cs.closed_via_restructure, cs.new_contract_no, cs.loan_amount,
+        cs.installment_amount, cs.interest_rate, cs.maturity_date,
+        cs.dpd_current, cs.overdue_installment_count, cs.late_fee_amount,
+        cs.ambc, cs.prnc_ots, cs.intr_ots,
+        COALESCE(cm.cust_name, cs.cust_id) AS cust_name,
+        ai.recovery_score, ai.risk_segment, ai.self_cure_probability,
+        ai.roll_forward_risk, ai.ptp_success_probability, ai.nba_recommendation,
+        ai.nba_trigger, ai.confidence_level, ai.scoring_date,
+        rs.restructure_group_id, rs.offer_status, rs.eligibility_tier
+    FROM contract_snapshot cs
+    LEFT JOIN customer_master cm ON cm.cust_id = cs.cust_id
+    LEFT JOIN LATERAL (
+        SELECT recovery_score, risk_segment, self_cure_probability, roll_forward_risk,
+               ptp_success_probability, nba_recommendation, nba_trigger, confidence_level,
+               scoring_date
+        FROM ai_intelligence_output
+        WHERE contract_no = cs.contract_no
+        ORDER BY scoring_date DESC LIMIT 1
+    ) ai ON TRUE
+    LEFT JOIN LATERAL (
+        -- Kontrak bisa pernah masuk >1 restructure_group_id (mis. sudah
+        -- pernah ditawari lalu ditawari ulang) — ambil yang generated_date
+        -- paling baru (lihat catatan spec TASK-D endpoint #5).
+        SELECT rro.restructure_group_id, rro.offer_status, rro.eligibility_tier
+        FROM restructuring_group_map rgm
+        JOIN restructuring_recommendation_output rro
+            ON rro.restructure_group_id = rgm.restructure_group_id
+        WHERE rgm.contract_no = cs.contract_no
+        ORDER BY rro.generated_date DESC LIMIT 1
+    ) rs ON TRUE
+"""
+
+_PAYMENT_HISTORY_SELECT = """
+    SELECT contract_no, due_date, actual_pay_date, payment_amount, pay_status,
+           delay_days, recovery_source
+    FROM payment_history
+"""
+
+
+def _row_to_contract_detail(row, payment_rows) -> ContractDetail:
+    ai_scoring = None
+    if row.scoring_date is not None:
+        ai_scoring = AiScoringSnapshot(
+            recovery_score=float(row.recovery_score) if row.recovery_score is not None else 0.0,
+            risk_segment=row.risk_segment,
+            self_cure_probability=(
+                float(row.self_cure_probability) if row.self_cure_probability is not None else 0.0
+            ),
+            roll_forward_risk=(
+                float(row.roll_forward_risk) if row.roll_forward_risk is not None else 0.0
+            ),
+            ptp_success_probability=(
+                float(row.ptp_success_probability) if row.ptp_success_probability is not None else 0.0
+            ),
+            nba_recommendation=row.nba_recommendation,
+            nba_trigger=row.nba_trigger,
+            confidence_level=float(row.confidence_level) if row.confidence_level is not None else 0.0,
+            scoring_date=row.scoring_date,
+        )
+
+    restructuring_status = None
+    if row.restructure_group_id is not None:
+        restructuring_status = RestructuringStatusSnapshot(
+            restructure_group_id=row.restructure_group_id,
+            offer_status=row.offer_status,
+            eligibility_tier=row.eligibility_tier,
+        )
+
+    return ContractDetail(
+        contract_no=row.contract_no,
+        cust_id=row.cust_id,
+        cust_name=row.cust_name,
+        product_type=row.product_type or "Unknown",
+        cycle=row.cycle,
+        prev_cycle=row.prev_cycle,
+        closed_via_restructure=bool(row.closed_via_restructure or False),
+        new_contract_no=row.new_contract_no,
+        loan_amount=float(row.loan_amount or 0),
+        installment_amount=float(row.installment_amount or 0),
+        interest_rate=float(row.interest_rate) if row.interest_rate is not None else 0.0,
+        maturity_date=row.maturity_date,
+        remaining_tenor_months=_remaining_tenor_months(row.maturity_date),
+        dpd_current=int(row.dpd_current or 0),
+        overdue_installment_count=int(row.overdue_installment_count or 0),
+        late_fee_amount=float(row.late_fee_amount or 0),
+        ambc=float(row.ambc or 0),
+        principal_ots=float(row.prnc_ots or 0),
+        interest_ots=float(row.intr_ots or 0),
+        ai_scoring=ai_scoring,
+        payment_history=[
+            PaymentHistoryEntry(
+                due_date=r.due_date,
+                actual_pay_date=r.actual_pay_date,
+                payment_amount=float(r.payment_amount or 0),
+                pay_status=r.pay_status,
+                delay_days=r.delay_days,
+                recovery_source=r.recovery_source,
+            )
+            for r in payment_rows
+        ],
+        restructuring_status=restructuring_status,
+    )
+
+
 class ContractRepository(IContractRepository):
     def __init__(self, engine: Engine):
         self._engine = engine
@@ -237,115 +344,58 @@ class ContractRepository(IContractRepository):
         return [_row_to_contract_list_row(r) for r in rows], int(total)
 
     def get_contract_detail(self, contract_no: str) -> Optional[ContractDetail]:
-        query = """
-            SELECT
-                cs.contract_no, cs.cust_id, cs.product_type, cs.cycle, cs.prev_cycle,
-                cs.closed_via_restructure, cs.new_contract_no, cs.loan_amount,
-                cs.installment_amount, cs.interest_rate, cs.maturity_date,
-                cs.dpd_current, cs.overdue_installment_count, cs.late_fee_amount,
-                cs.ambc, cs.prnc_ots, cs.intr_ots,
-                COALESCE(cm.cust_name, cs.cust_id) AS cust_name,
-                ai.recovery_score, ai.risk_segment, ai.self_cure_probability,
-                ai.roll_forward_risk, ai.ptp_success_probability, ai.nba_recommendation,
-                ai.confidence_level, ai.scoring_date,
-                rs.restructure_group_id, rs.offer_status, rs.eligibility_tier
-            FROM contract_snapshot cs
-            LEFT JOIN customer_master cm ON cm.cust_id = cs.cust_id
-            LEFT JOIN LATERAL (
-                SELECT recovery_score, risk_segment, self_cure_probability, roll_forward_risk,
-                       ptp_success_probability, nba_recommendation, confidence_level, scoring_date
-                FROM ai_intelligence_output
-                WHERE contract_no = cs.contract_no
-                ORDER BY scoring_date DESC LIMIT 1
-            ) ai ON TRUE
-            LEFT JOIN LATERAL (
-                -- Kontrak bisa pernah masuk >1 restructure_group_id (mis. sudah
-                -- pernah ditawari lalu ditawari ulang) — ambil yang generated_date
-                -- paling baru (lihat catatan spec TASK-D endpoint #5).
-                SELECT rro.restructure_group_id, rro.offer_status, rro.eligibility_tier
-                FROM restructuring_group_map rgm
-                JOIN restructuring_recommendation_output rro
-                    ON rro.restructure_group_id = rgm.restructure_group_id
-                WHERE rgm.contract_no = cs.contract_no
-                ORDER BY rro.generated_date DESC LIMIT 1
-            ) rs ON TRUE
-            WHERE cs.contract_no = :contract_no
-        """
         with self._engine.connect() as conn:
-            row = conn.execute(text(query), {"contract_no": contract_no}).fetchone()
+            row = conn.execute(
+                text(_CONTRACT_DETAIL_SELECT + " WHERE cs.contract_no = :contract_no"),
+                {"contract_no": contract_no},
+            ).fetchone()
             if not row:
                 return None
-
             payment_rows = conn.execute(
-                text(
-                    "SELECT due_date, actual_pay_date, payment_amount, pay_status, "
-                    "delay_days, recovery_source FROM payment_history "
-                    "WHERE contract_no = :contract_no ORDER BY due_date DESC LIMIT 12"
-                ),
+                text(_PAYMENT_HISTORY_SELECT + " WHERE contract_no = :contract_no ORDER BY due_date DESC LIMIT 12"),
                 {"contract_no": contract_no},
             ).fetchall()
+        return _row_to_contract_detail(row, payment_rows)
 
-        ai_scoring = None
-        if row.scoring_date is not None:
-            ai_scoring = AiScoringSnapshot(
-                recovery_score=float(row.recovery_score) if row.recovery_score is not None else 0.0,
-                risk_segment=row.risk_segment,
-                self_cure_probability=(
-                    float(row.self_cure_probability) if row.self_cure_probability is not None else 0.0
+    def list_active_contracts_for_customer(self, cust_id: str) -> List[ContractDetail]:
+        # SEMUA kontrak aktif, TANPA LIMIT — payload AI Reasoning wajib melihat
+        # seluruh portofolio debitur (ai-reasoning-api-upgrade-tasks.md §8.1).
+        # Data nyata: maksimum 3 kontrak aktif/debitur, jadi tidak ada masalah
+        # ukuran payload di sini.
+        with self._engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    _CONTRACT_DETAIL_SELECT
+                    + " WHERE cs.cust_id = :cust_id AND COALESCE(cs.closed_via_restructure, FALSE) = FALSE"
+                    + " ORDER BY cs.dpd_current DESC"
                 ),
-                roll_forward_risk=(
-                    float(row.roll_forward_risk) if row.roll_forward_risk is not None else 0.0
-                ),
-                ptp_success_probability=(
-                    float(row.ptp_success_probability) if row.ptp_success_probability is not None else 0.0
-                ),
-                nba_recommendation=row.nba_recommendation,
-                confidence_level=float(row.confidence_level) if row.confidence_level is not None else 0.0,
-                scoring_date=row.scoring_date,
-            )
+                {"cust_id": cust_id},
+            ).fetchall()
+            if not rows:
+                return []
 
-        restructuring_status = None
-        if row.restructure_group_id is not None:
-            restructuring_status = RestructuringStatusSnapshot(
-                restructure_group_id=row.restructure_group_id,
-                offer_status=row.offer_status,
-                eligibility_tier=row.eligibility_tier,
-            )
+            contract_nos = [r.contract_no for r in rows]
+            # 1 query untuk payment_history SEMUA kontrak (hindari N+1), lalu
+            # dikelompokkan di Python — payload builder hanya butuh 6
+            # pembayaran terakhir/kontrak (§8.1), bukan 12 seperti Contract Detail.
+            payment_rows = conn.execute(
+                text(
+                    _PAYMENT_HISTORY_SELECT
+                    + " WHERE contract_no = ANY(:contract_nos) ORDER BY contract_no, due_date DESC"
+                ),
+                {"contract_nos": contract_nos},
+            ).fetchall()
 
-        return ContractDetail(
-            contract_no=row.contract_no,
-            cust_id=row.cust_id,
-            cust_name=row.cust_name,
-            product_type=row.product_type or "Unknown",
-            cycle=row.cycle,
-            prev_cycle=row.prev_cycle,
-            closed_via_restructure=bool(row.closed_via_restructure or False),
-            new_contract_no=row.new_contract_no,
-            loan_amount=float(row.loan_amount or 0),
-            installment_amount=float(row.installment_amount or 0),
-            interest_rate=float(row.interest_rate) if row.interest_rate is not None else 0.0,
-            maturity_date=row.maturity_date,
-            remaining_tenor_months=_remaining_tenor_months(row.maturity_date),
-            dpd_current=int(row.dpd_current or 0),
-            overdue_installment_count=int(row.overdue_installment_count or 0),
-            late_fee_amount=float(row.late_fee_amount or 0),
-            ambc=float(row.ambc or 0),
-            principal_ots=float(row.prnc_ots or 0),
-            interest_ots=float(row.intr_ots or 0),
-            ai_scoring=ai_scoring,
-            payment_history=[
-                PaymentHistoryEntry(
-                    due_date=r.due_date,
-                    actual_pay_date=r.actual_pay_date,
-                    payment_amount=float(r.payment_amount or 0),
-                    pay_status=r.pay_status,
-                    delay_days=r.delay_days,
-                    recovery_source=r.recovery_source,
-                )
-                for r in payment_rows
-            ],
-            restructuring_status=restructuring_status,
-        )
+        payments_by_contract: dict = {}
+        for r in payment_rows:
+            bucket = payments_by_contract.setdefault(r.contract_no, [])
+            if len(bucket) < 6:
+                bucket.append(r)
+
+        return [
+            _row_to_contract_detail(row, payments_by_contract.get(row.contract_no, []))
+            for row in rows
+        ]
 
     def get_activity_log(self, contract_no: str) -> List[ActivityLogEntry]:
         query = """

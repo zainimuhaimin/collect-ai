@@ -221,10 +221,10 @@ class ActivityLogEntrySchema(BaseModel):
         json_schema_extra={
             "example": {
                 "id": "LKP-000123",
-                "icon": "sms",
-                "title": "SMS — Bayar",
+                "icon": "chat",
+                "title": "WA — Bayar",
                 "timestamp": "12 Oct 2023",
-                "description": "Kontak via SMS, hasil: Bayar",
+                "description": "Kontak via WA, hasil: Bayar",
                 "tone": "default",
             }
         }

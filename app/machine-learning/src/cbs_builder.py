@@ -130,6 +130,11 @@ def build_cbs(
         "ptp_reliability_index", "collection_sensitivity",
         "b_list_status", "update_timestamp",
         "restructure_count", "last_restructure_date",
+        # historical_default_count/income_debt_ratio SUDAH dihitung benar oleh
+        # compute_customer_features() dan ada di df sejak awal fungsi ini —
+        # sebelumnya dibuang di sini, sehingga daily_scoring.py selalu memaksa
+        # 0.0 untuk keduanya dan cabang NBA "Pickup" tidak pernah bisa terpicu.
+        "historical_default_count", "income_debt_ratio",
     ]
     return df[out_cols].copy()
 

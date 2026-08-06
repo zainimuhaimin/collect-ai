@@ -9,7 +9,7 @@ The [MSW](https://mswjs.io/) fixtures in `src/mocks/` are still maintained and s
 Two things to keep in mind when reading the rest of this folder:
 
 - **The shapes below are the contract that is already live.** If a document here disagrees with the backend, the backend's OpenAPI schema at `http://localhost:8000/docs` is the source of truth — please fix the doc.
-- **Two modules described here as "new" are built:** Auth (`01-auth.md`) and Restructuring Approval (`09-restructuring-approval.md`). The "Backend status" column in the table below reflects the *original* build-priority assessment and is kept for historical context, not as current status.
+- **Three modules described here as "new" are built:** Auth (`01-auth.md`), Restructuring Approval (`09-restructuring-approval.md`), and AI Reasoning (no numbered doc file yet — see the row below and `app/backend/README.md` §14 for the full contract with curl examples). The "Backend status" column in the table below reflects the *original* build-priority assessment and is kept for historical context, not as current status.
 
 ## Modules
 
@@ -24,6 +24,7 @@ Read them in this order — it roughly matches build priority (clearest backend 
 | 5 | Contract | [`07-contract.md`](./07-contract.md) | **Maps closely to existing tables** (`contract_snapshot`, `payment_history`, `ai_intelligence_output`, `lkp_interaction`) |
 | 6 | Restructuring (customer-facing) | [`08-restructuring.md`](./08-restructuring.md) | **Mostly exists** — mirrors `app/backend/schemas/restructuring.py` / `restructuring_recommendation_output` |
 | 7 | Restructuring Approval | [`09-restructuring-approval.md`](./09-restructuring-approval.md) | New — approve/reject queue + audit log over `restructuring_recommendation_output` |
+| 8 | AI Reasoning | *(no numbered doc yet — see `src/domains/ai-reasoning/` + `app/backend/README.md` §14)* | New — hyper-personalization per debtor over `ai_reasoning_output`, calls Gemini |
 
 ## Conventions used across every module
 

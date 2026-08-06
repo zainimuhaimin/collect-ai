@@ -1,12 +1,12 @@
 -- app/machine-learning/config/schema_combined.sql
 -- Schema gabungan CollectAI ML (schema.sql v1 + schema_v2.sql + schema_v3.sql
--- + schema_v4.sql)
+-- + schema_v4.sql + schema_v5.sql + schema_v6.sql)
 -- Ditulis sebagai fresh install — semua kolom upgrade sudah menyatu
 -- langsung di CREATE TABLE (bukan ALTER TABLE terpisah).
 --
 -- Gunakan file ini untuk instalasi baru. schema.sql, schema_v2.sql,
--- schema_v3.sql, dan schema_v4.sql tetap dipertahankan sebagai riwayat
--- migrasi bertahap (v1 -> v4).
+-- schema_v3.sql, schema_v4.sql, schema_v5.sql, dan schema_v6.sql tetap
+-- dipertahankan sebagai riwayat migrasi bertahap (v1 -> v6).
 
 -- ── INPUT TABLES (read-only sumber data) ──────────────────────────
 
@@ -60,8 +60,9 @@ CREATE TABLE IF NOT EXISTS payment_history (
     delay_days          INTEGER,
     -- ── kolom upgrade (eks schema_v2) ──
     self_cure_flag      BOOLEAN         DEFAULT FALSE,
+    -- SMS dihapus (dilebur ke WA, keputusan #7 / P0-1, schema_v6.sql)
     recovery_source     VARCHAR(20)     CHECK (recovery_source IS NULL OR
-                                                recovery_source IN ('WA', 'SMS', 'Deskcoll', 'Visit', 'Somasi'))
+                                                recovery_source IN ('WA', 'Deskcoll', 'Visit', 'Somasi'))
 );
 
 CREATE TABLE IF NOT EXISTS lkp_interaction (
@@ -97,7 +98,9 @@ CREATE TABLE IF NOT EXISTS ai_intelligence_output (
     -- ── kolom upgrade (eks schema_v2) — output 3 sub-model baru ──
     self_cure_probability    NUMERIC(5,4),
     roll_forward_risk        NUMERIC(5,4),
-    ptp_success_probability  NUMERIC(5,4)
+    ptp_success_probability  NUMERIC(5,4),
+    -- ── kolom upgrade (eks schema_v5) — cabang NBA yang menang ──
+    nba_trigger              VARCHAR(60)
 );
 
 -- ── OUTPUT TABLE 2: Customer Behavioral Standing ──────────────────
@@ -113,7 +116,10 @@ CREATE TABLE IF NOT EXISTS customer_behavioral_standing (
     update_timestamp          TIMESTAMP      DEFAULT NOW(),
     -- ── kolom upgrade (eks schema_v3 — restructuring engine) ──
     restructure_count         INTEGER        DEFAULT 0,
-    last_restructure_date     DATE
+    last_restructure_date     DATE,
+    -- ── kolom upgrade (eks schema_v5) — nilai asli, bukan dibuang lagi ──
+    historical_default_count  INT            DEFAULT 0,
+    income_debt_ratio         NUMERIC(10,4)  DEFAULT 0
 );
 
 -- ── MLOPS TABLE: Scoring Labels ───────────────────────────────────

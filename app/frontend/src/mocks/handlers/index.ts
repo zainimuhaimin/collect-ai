@@ -1,6 +1,7 @@
 import { customerHandlers } from './customer.handlers';
 import { dashboardHandlers } from './dashboard.handlers';
 import { aiIntelligenceHandlers } from './aiIntelligence.handlers';
+import { aiReasoningHandlers } from './aiReasoning.handlers';
 import { contractHandlers } from './contract.handlers';
 import { restructuringHandlers } from './restructuring.handlers';
 
@@ -16,6 +17,7 @@ export const handlers = [
   ...customerHandlers,
   ...dashboardHandlers,
   ...aiIntelligenceHandlers,
+  ...aiReasoningHandlers,
   ...contractHandlers,
   ...restructuringHandlers,
 ];

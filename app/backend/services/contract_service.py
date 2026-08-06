@@ -7,11 +7,11 @@ from services.pagination import build_page_info
 VALID_CONTRACT_FILTERS = ("all", "dpd_30_plus", "high_priority", "broken_ptp", "high_ambc")
 
 # Treatment_type nyata di lkp_interaction (lihat faker/generate-faker-realistic.py):
-# WA, SMS, Deskcoll, Visit, Somasi, Pickup — TIDAK ada 'Call'/'WhatsApp'/'Telepon'
+# WA, Deskcoll, Visit, Somasi, Pickup — TIDAK ada 'Call'/'WhatsApp'/'Telepon'
 # seperti asumsi awal, mapping ini disesuaikan ke nilai asli yang benar-benar
-# ada di database (bukan ditebak dari nama field).
+# ada di database (bukan ditebak dari nama field). SMS dilebur ke WA (keputusan
+# #7, ai-reasoning-api-upgrade-tasks.md P0-1) — tidak ada lagi baris SMS baru.
 _TREATMENT_ICON_MAP = {
-    "SMS": "sms",
     "WA": "chat",
     "Visit": "home",
     "Deskcoll": "call",

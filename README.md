@@ -30,7 +30,7 @@ Postgres** dan **satu file `.env` di root**.
 
 | Komponen | Isi | README |
 |---|---|---|
-| `app/backend/` | REST API FastAPI — menyajikan data customer/kontrak/dashboard ke frontend, dan memicu pipeline ML lewat tombol Sync | [baca](app/backend/README.md) |
+| `app/backend/` | REST API FastAPI — menyajikan data customer/kontrak/dashboard ke frontend, memicu pipeline ML lewat tombol Sync, dan mengorkestrasi AI Reasoning (Gemini) per debitur on-demand | [baca](app/backend/README.md) |
 | `app/frontend/` | SPA React 19 + Vite + Tailwind — 5 menu untuk petugas collection & supervisor | [baca](app/frontend/README.md) |
 | `app/machine-learning/` | Pipeline XGBoost: feature engineering, 4 model scoring, MLOps (drift/retrain), batch restrukturisasi | [baca](app/machine-learning/README.md) |
 | `app/shared/` | `restructuring_offer_calculator.py` — kalkulasi tawaran restrukturisasi. **Satu-satunya salinan**, di-import bersama oleh backend dan ML | — |
@@ -105,6 +105,15 @@ Prinsip pemisahan yang dipegang di repo ini:
 backend tidak pernah meng-import modul ML ke dalam prosesnya (Sync memanggil
 pipeline lewat *subprocess*).
 
+**Jalur terpisah — AI Reasoning.** Di luar diagram batch di atas, tombol
+"Generate" di Customer Detail memicu jalur *on-demand* tersendiri: backend
+merakit payload dari `ai_intelligence_output` + `customer_behavioral_standing`
++ kontrak aktif **seluruh debitur** (bukan per kontrak), memanggil Google
+Gemini, lalu menyimpan hasilnya ke `ai_reasoning_output`. Ini satu-satunya
+titik di sistem yang memanggil API pihak ketiga berbayar — lihat
+[`app/backend/README.md`](app/backend/README.md) dan
+[`ai-reasoning-api-upgrade-tasks.md`](ai-reasoning-api-upgrade-tasks.md).
+
 ---
 
 ## Quick start dengan Docker Compose
@@ -162,26 +171,36 @@ pip install -r faker/requirements.txt
 cp .env.example .env               # lalu isi nilai asli
 ```
 
+Fitur AI Reasoning mati secara default (`AI_REASONING_ENABLED=false`) — cukup
+aman diabaikan kalau tidak dibutuhkan. Untuk menyalakannya: isi
+`GOOGLE_AI_STUDIO_API_KEYS` (array JSON, boleh lebih dari 1 key untuk rotasi
+otomatis saat quota habis) dan set `AI_REASONING_ENABLED=true`. Endpoint ini
+memicu panggilan berbayar ke Gemini setiap kali tombol "Generate" diklik untuk
+debitur yang belum ada cache-nya — lihat `AI_REASONING_DAILY_CALL_LIMIT` di
+`.env.example` untuk batas harian.
+
 ### 2. Database
 
 ```bash
 createdb collect_ai   # kalau belum ada
 
-# Schema gabungan: 4 tabel input + tabel output ML + tabel restrukturisasi
-psql -d collect_ai -f app/machine-learning/config/schema_combined.sql
-
-# Tabel khusus backend: users + governance/audit
-psql -d collect_ai -f app/backend/db/schema_users.sql
-psql -d collect_ai -f app/backend/db/schema_governance.sql
+# Satu file, satu perintah — gabungan seluruh tabel dari app/machine-learning/
+# (4 tabel input + output ML + MLOps + restructuring engine) DAN app/backend/
+# (users, governance/audit, ai_reasoning_output). Lihat header schema.sql
+# untuk rincian bagian mana berasal dari file mana.
+psql -d collect_ai -f schema.sql
 
 # User dev untuk login (admin / admin123)
 cd app/backend && python -m scripts.seed_dev_user && cd ../..
 ```
 
-Semua file schema bersifat **idempoten** (`CREATE TABLE IF NOT EXISTS` /
+`schema.sql` bersifat **idempoten** (`CREATE TABLE IF NOT EXISTS` /
 `ADD COLUMN IF NOT EXISTS`), jadi aman dijalankan berulang. Repo ini **tidak
 memakai migration framework** — penambahan kolom dilakukan dengan menambah
-`ALTER TABLE ... ADD COLUMN IF NOT EXISTS` ke file schema, lalu `psql -f` lagi.
+`ALTER TABLE ... ADD COLUMN IF NOT EXISTS` ke file schema per subproject
+(`app/machine-learning/config/schema_v*.sql` atau
+`app/backend/db/schema_governance.sql`), lalu disalin ulang secara manual ke
+`schema.sql` root supaya fresh-install tetap dari SATU file.
 
 ### 3. Seed data & model pertama
 
@@ -236,8 +255,10 @@ collect-ai/
 ├── README.md                     # ← dokumen ini
 ├── .env.example                  # template kredensial bersama (copy jadi .env)
 ├── docker-compose.yml            # db + backend + frontend
-├── init_table.sql                # DDL 4 tabel input versi paling awal (historis;
-│                                 #   pemakaian sekarang: schema_combined.sql)
+├── schema.sql                     # ← SATU file untuk init DB dari nol — gabungan
+│                                 #   seluruh schema app/machine-learning/ + app/backend/
+├── init_table.sql                # DDL 4 tabel input versi paling awal (historis,
+│                                 #   TIDAK dipakai lagi — pakai schema.sql)
 ├── *.md                          # dokumen desain per fitur — lihat "Peta dokumentasi"
 │
 ├── app/
@@ -247,11 +268,13 @@ collect-ai/
 │   │   ├── domain/               #   dataclass murni, bebas Pydantic/FastAPI
 │   │   ├── schemas/              #   Pydantic — boundary HTTP saja
 │   │   ├── repositories/         #   interfaces.py + implementasi Postgres
-│   │   ├── services/             #   business logic, depend ke interface saja
+│   │   ├── services/             #   business logic, depend ke interface saja —
+│   │   │                         #   termasuk ai_reasoning_service.py + gemini_client.py
 │   │   ├── api/v1/routers/       #   auth, customers, contracts, dashboard,
 │   │   │                         #   restructuring, restructuring_groups,
-│   │   │                         #   ai_intelligence
+│   │   │                         #   ai_intelligence, ai_reasoning
 │   │   ├── db/                   #   schema_users.sql, schema_governance.sql
+│   │   │                         #   (users, model_governance_*, ai_reasoning_output)
 │   │   ├── scripts/              #   seed_dev_user.py
 │   │   └── tests/                #   test_smoke.py (E2E ke Postgres asli)
 │   │
@@ -298,6 +321,7 @@ collect-ai/
 | **NBA** | *Next Best Action* — channel penagihan yang direkomendasikan. Domainnya **tepat 5 nilai**: `WA`, `Deskcoll`, `Visit`, `Somasi`, `Pickup` |
 | **Risk segment** | **Tepat 4 nilai**: `Won't Pay`, `Cannot Pay`, `Self-cure`, `Can Pay` |
 | **CBS** | *Customer Behavioral Standing* — profil perilaku level customer (grade A-D, sensitivitas channel, B-list) |
+| **AI Reasoning** | Fitur *on-demand* (bukan batch) yang merekonsiliasi NBA dari **seluruh kontrak aktif satu debitur** jadi satu strategi penanganan via Gemini — grain-nya DEBITUR, beda dari NBA per kontrak di atas. Lihat `ai-reasoning-api-upgrade-tasks.md` |
 | **Champion / Challenger** | Model yang dipakai produksi vs kandidat penggantinya yang dievaluasi *shadow mode* |
 | **Label window** | 30 hari (`LABEL_WINDOW_DAYS`). Semua model memakai satu label: `actual_paid` — ada pembayaran `Full`/`Partial` dalam 30 hari setelah tanggal referensi |
 | **Feature cutoff** | Fitur hanya boleh memakai data s/d `reference_date − 30 hari`. Ini penjaga anti-*leakage* utama — jangan dilemahkan |
@@ -386,7 +410,8 @@ diimplementasikan, beberapa masih rencana:
 | [`backend-architecture-tasks.md`](backend-architecture-tasks.md) | Arsitektur berlapis backend | Terimplementasi |
 | [`frontend-layout-upgrade-tasks.md`](frontend-layout-upgrade-tasks.md) | 5 menu, TASK-A s/d TASK-F | Sebagian terimplementasi |
 | [`frontend-refinement-round2-tasks.md`](frontend-refinement-round2-tasks.md) · [`round4`](frontend-refinement-round4-tasks.md) | Perbaikan UI bertahap | Terimplementasi |
-| [`ai-reasoning-api-upgrade-tasks.md`](ai-reasoning-api-upgrade-tasks.md) | Integrasi LLM untuk narasi analisa | **Rencana** — belum ada kode |
+| [`ai-reasoning-api-upgrade-tasks.md`](ai-reasoning-api-upgrade-tasks.md) | Integrasi LLM (Gemini) untuk narasi analisa level-debitur, hyper-personalization lintas kontrak | Terimplementasi — auth endpoint & ringkasan kontrak lunas 3 tahun masih ditunda |
+| [`ai-reasoning-prompt-spec.md`](ai-reasoning-prompt-spec.md) | Kontrak teknis prompt Gemini: system instruction lengkap, bentuk payload per-debitur, response schema, contoh nyata ujung ke ujung | Referensi — untuk showcase/demo |
 | [`collect-ai-upgrade.md`](collect-ai-upgrade.md) · [`collection-task.md`](collection-task.md) · [`collection-handoff.md`](collection-handoff.md) | Catatan historis & handoff | Historis |
 
 Dokumentasi kontrak HTTP per modul: [`app/frontend/docs/api/`](app/frontend/docs/api/README.md).
@@ -397,10 +422,14 @@ Dokumentasi kontrak HTTP per modul: [`app/frontend/docs/api/`](app/frontend/docs
 
 Didaftar terbuka supaya tidak ditemukan ulang dengan susah payah:
 
-1. **Endpoint `/customers` dan `/contracts` belum punya autentikasi.** Tidak ada
-   dependency auth global di `main.py`. Hanya beberapa route AI Intelligence dan
-   Restructuring Approval yang memakai `Depends(get_current_user)`, dan itu pun
-   didokumentasikan sebagai *audit trail*, **bukan** gate akses.
+1. **Endpoint `/customers`, `/contracts`, dan `/customers/{id}/ai-reasoning`
+   belum punya autentikasi.** Tidak ada dependency auth global di `main.py`.
+   Hanya beberapa route AI Intelligence dan Restructuring Approval yang
+   memakai `Depends(get_current_user)`, dan itu pun didokumentasikan sebagai
+   *audit trail*, **bukan** gate akses. Untuk AI Reasoning ini risiko lebih
+   tinggi dari endpoint lain: `POST`-nya memicu panggilan berbayar ke Gemini —
+   ditunda secara sadar karena keterbatasan waktu, dicatat di
+   `ai-reasoning-api-upgrade-tasks.md` §10.
 2. **Tidak ada RBAC.** Semua menu terlihat oleh setiap user yang login,
    termasuk Restructuring Approval dan AI Intelligence.
 3. **AUC "live" di kartu Model Health baru terisi setelah ~30 hari** riwayat
@@ -411,14 +440,14 @@ Didaftar terbuka supaya tidak ditemukan ulang dengan susah payah:
    Batas distribusi segmen itu asumsi komposisi portfolio, bukan invariant
    kebenaran pipeline — menggagalkan seluruh run karena komposisi bergeser berarti
    nol skor tersimpan. Pelanggaran tetap dicetak sebagai warning.
-5. **Beberapa fitur ML selalu bernilai 0**: `delay_trend`,
-   `historical_default_count`, `income_debt_ratio`, `broken_ptp_count` —
+5. **Beberapa fitur ML selalu bernilai 0**: `delay_trend`, `broken_ptp_count` —
    `cbs_builder.build_cbs()` tidak pernah mengembalikannya. `restructure_count`
    juga selalu 0 karena `update_cbs()` tidak punya pemanggil produksi.
-6. **`SMS` hilang dari dua peta ranking channel** (`feature_engineering.py` dan
-   `business_rules.py`) padahal SMS channel nyata — akibatnya override
-   `collection_sensitivity` mati diam-diam untuk nasabah yang paling responsif
-   via SMS.
+   (`historical_default_count`/`income_debt_ratio` **sudah diperbaiki** —
+   lihat `schema_v5.sql`, cabang NBA `Pickup` sekarang bisa terpicu.)
+6. ~~`SMS` hilang dari dua peta ranking channel~~ — **sudah diperbaiki**: channel
+   `SMS` dihapus sepenuhnya dari sistem dan dilebur ke `WA`
+   (`schema_v6.sql`, lihat `ai-reasoning-api-upgrade-tasks.md` §9 P0-1).
 7. **Hyperparameter XGBoost (`n_estimators=500, max_depth=6`) over-parameterized**
    untuk ~2.900 baris data.
 8. **Dark mode ditulis tapi belum bisa diaktifkan** — ~373 utility `dark:`

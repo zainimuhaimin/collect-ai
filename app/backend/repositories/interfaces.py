@@ -14,11 +14,14 @@ from typing import List, Optional, Tuple
 
 from domain.models import (
     ActivityLogEntry,
+    AiReasoningHealthSnapshot,
+    AiReasoningRecord,
     CbsWeight,
     Contract,
     ContractDetail,
     ContractListRow,
     Customer,
+    CustomerBehavioralRaw,
     CustomerListRow,
     CustomerProfile,
     DashboardSummary,
@@ -56,6 +59,17 @@ class ICustomerRepository(ABC):
 
     @abstractmethod
     def exists(self, cust_id: str) -> bool:
+        ...
+
+    @abstractmethod
+    def get_behavioral_raw(self, cust_id: str) -> Optional[CustomerBehavioralRaw]:
+        """customer_behavioral_standing APA ADANYA (lihat docstring
+        CustomerBehavioralRaw) — TERPISAH dari get_customer_profile() yang
+        meng-coalesce NULL->0/default untuk keperluan tampilan UI. Dipakai
+        fitur AI Reasoning, yang justru butuh tahu kalau suatu field memang
+        tidak ada, bukan 0. None kalau cust_id tidak ada sama sekali di
+        customer_master (bukan sekadar belum punya baris CBS — itu dibedakan
+        lewat `has_cbs_row`)."""
         ...
 
 
@@ -97,6 +111,18 @@ class IContractRepository(ABC):
     def get_activity_log(self, contract_no: str) -> List[ActivityLogEntry]:
         """1 endpoint dipakai 2 tempat: Contract Detail timeline & expand
         per-kontrak di Customer Detail (TASK-C/D) — supaya datanya konsisten."""
+        ...
+
+    @abstractmethod
+    def list_active_contracts_for_customer(self, cust_id: str) -> List[ContractDetail]:
+        """SEMUA kontrak AKTIF (belum closed_via_restructure) milik 1 customer,
+        detail penuh (bentuk sama dengan get_contract_detail(), payment_history
+        dibatasi 6 baris terakhir per kontrak). Dipakai fitur AI Reasoning
+        (ai-reasoning-api-upgrade-tasks.md §8.1) yang WAJIB melihat seluruh
+        portofolio debitur, bukan hanya kontrak utama — beda dari
+        get_primary_contract_for_customer()/get_sibling_contracts() yang ada
+        di atas, keduanya tidak memfilter closed_via_restructure DAN tidak
+        mengembalikan detail selengkap ContractDetail."""
         ...
 
 
@@ -221,6 +247,71 @@ class IAiIntelligenceSyncRepository(ABC):
         muncul di Operational Log. TIDAK boleh melempar exception ke caller:
         gagal mencatat audit tidak boleh menggagalkan job Sync yang sebenarnya
         sudah sukses."""
+        ...
+
+
+class IAiReasoningRepository(ABC):
+    """Akses ai_reasoning_output (ai-reasoning-api-upgrade-tasks.md) — dipisah
+    dari repository lain (ISP) karena siklus hidupnya khas: cache baca-tulis
+    per debitur dengan guard konkurensi berbasis baris DB, bukan CRUD biasa."""
+
+    @abstractmethod
+    def get_cached(
+        self, cust_id: str, source_signature: str, prompt_version: str
+    ) -> Optional[AiReasoningRecord]:
+        """Baris untuk kombinasi (cust_id, source_signature, prompt_version)
+        PERSIS ini, apa pun status-nya — dipakai generate() untuk cek "apakah
+        sudah ada hasil valid (OK/FALLBACK) untuk signature SAAT INI", jadi
+        exact-match, bukan 'yang terakhir'. None kalau signature sudah berubah
+        (skor diperbarui/kontrak baru/kontrak ditutup) — itu artinya basi,
+        bukan "belum pernah ada apa-apa"."""
+        ...
+
+    @abstractmethod
+    def get_latest(self, cust_id: str, prompt_version: str) -> Optional[AiReasoningRecord]:
+        """Baris TERBARU (created_at DESC) untuk cust_id ini, TANPA syarat
+        signature cocok — dipakai GET untuk tetap menampilkan hasil terakhir
+        walau sudah basi (caller yang membandingkan `source_signature`-nya
+        dengan signature saat ini untuk menentukan flag `stale`), supaya UI
+        tidak tiba-tiba kosong hanya karena satu kontrak baru saja diperbarui."""
+        ...
+
+    @abstractmethod
+    def try_claim_running(self, cust_id: str, source_signature: str, prompt_version: str) -> bool:
+        """Klaim slot 'RUNNING' via guarded UPSERT (bukan SELECT-then-INSERT
+        — lihat restructuring_offer_repository.py::update_offer_status() untuk
+        pola race-condition-safe yang sama: kondisi guard ada DI DALAM
+        WHERE/ON CONFLICT, bukan dicek terpisah sebelum insert). Return False
+        kalau sudah ada RUNNING lain yang masih berjalan — caller menerjemahkan
+        ini jadi 409."""
+        ...
+
+    @abstractmethod
+    def save_result(self, record: AiReasoningRecord) -> None:
+        """Overwrite baris RUNNING yang sudah diklaim dengan hasil akhir
+        (OK/FALLBACK/FAILED/INSUFFICIENT_DATA)."""
+        ...
+
+    @abstractmethod
+    def count_generated_today(self) -> int:
+        """Jumlah baris NON-RUNNING yang dibuat hari ini — dipakai gate
+        ai_reasoning_daily_call_limit. Sengaja mengecualikan RUNNING supaya
+        job yang sedang berjalan tidak dihitung dua kali saat diselesaikan."""
+        ...
+
+    @abstractmethod
+    def get_health_snapshot(self) -> AiReasoningHealthSnapshot:
+        """Agregat 7 hari terakhir untuk kartu Model Health — lihat
+        AiReasoningHealthSnapshot."""
+        ...
+
+    @abstractmethod
+    def log_reasoning_event(self, cust_id: str, status: str, detail: dict) -> None:
+        """Insert 1 baris model_governance_audit_log (action='AI_REASONING_GENERATE')
+        — supaya generate AI Reasoning muncul di Operational Log, sama seperti
+        job Sync (lihat IAiIntelligenceSyncRepository.log_sync_event). TIDAK
+        boleh melempar exception ke caller — audit gagal tidak boleh
+        menggagalkan generate yang sebenarnya sudah selesai."""
         ...
 
 

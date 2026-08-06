@@ -702,14 +702,17 @@ INTENSITY_DEEP = 3.5
 
 CHANNEL_MIX = [
     # (max_dpd, channels, weights)
-    (0, ['WA', 'SMS', 'Deskcoll'], [0.55, 0.35, 0.10]),
-    (30, ['WA', 'Deskcoll', 'SMS', 'Visit'], [0.40, 0.40, 0.15, 0.05]),
+    # SMS merged into WA (decision #7, ai-reasoning-api-upgrade-tasks.md P0-1):
+    # its share is reallocated onto WA rather than dropped, so bucket C0/C1
+    # interaction volume doesn't shrink and the distribution stays realistic.
+    (0, ['WA', 'Deskcoll'], [0.90, 0.10]),
+    (30, ['WA', 'Deskcoll', 'Visit'], [0.55, 0.40, 0.05]),
     (60, ['Deskcoll', 'Visit', 'WA', 'Somasi'], [0.40, 0.40, 0.15, 0.05]),
     (90, ['Visit', 'Somasi', 'Deskcoll', 'Pickup'], [0.45, 0.30, 0.15, 0.10]),
 ]
 CHANNEL_MIX_DEEP = (['Pickup', 'Somasi', 'Visit', 'Deskcoll'], [0.35, 0.35, 0.25, 0.05])
 
-CHANNEL_CONTACT_EFFECT = {'WA': 0.35, 'SMS': 0.0, 'Deskcoll': 0.30, 'Visit': 0.10, 'Somasi': -0.10, 'Pickup': -0.25}
+CHANNEL_CONTACT_EFFECT = {'WA': 0.35, 'Deskcoll': 0.30, 'Visit': 0.10, 'Somasi': -0.10, 'Pickup': -0.25}
 
 RESULT_SCORE_BASE = {
     'Bayar': (4, 5), 'PTP': (3, 4), 'Tidak Bisa': (2, 3),
@@ -732,14 +735,6 @@ def _pick_channel(dpd_at_time, escalated):
 
 
 def _draw_result(w, c, arrears, channel, has_payment_soon, contactability=0.0):
-    # Contact rate raised and SMS's forced-no-reply share lowered from earlier
-    # values: SMS alone was such a large share of all interactions, and its
-    # no-reply branch fired regardless of w/c/arrears, that "no contact"
-    # results dominated the whole population (>50% of all LKP rows), making
-    # rejection_count (which includes the no-contact codes) track
-    # treatment_count almost 1:1 rather than reflecting genuinely worse-
-    # behaving accounts.
-    #
     # `contactability` is a per-contract random effect independent of arrears
     # (e.g. a wrong/updated phone number, works from home vs. a hard-to-reach
     # job) — without it, event VOLUME and contact FAILURE RATE are driven by
@@ -747,9 +742,6 @@ def _draw_result(w, c, arrears, channel, has_payment_soon, contactability=0.0):
     # counts move together almost mechanically even though they're measuring
     # different things.
     p_contact = _sigmoid(1.00 + 0.50 * w - 0.25 * arrears + contactability + CHANNEL_CONTACT_EFFECT.get(channel, 0.0))
-    if channel == 'SMS' and RNG.random() > 0.45:
-        # One-way channel: still a low reply rate, but not the majority outcome.
-        return RESULT_NO_CONTACT_REMOTE, False, False
     if RNG.random() > p_contact:
         if channel in FIELD_CHANNELS:
             return RESULT_NO_CONTACT_FIELD, False, False
@@ -874,7 +866,7 @@ def generate_lkp_history(df_terms, paths, t_cut, as_of):
 # 5. PAYMENT HISTORY
 # ==========================================
 TREATMENT_TO_SOURCE = {
-    'WA': 'WA', 'SMS': 'SMS', 'Deskcoll': 'Deskcoll',
+    'WA': 'WA', 'Deskcoll': 'Deskcoll',
     'Visit': 'Visit', 'Somasi': 'Somasi', 'Pickup': 'Somasi',
 }
 PAY_METHODS = ['Autodebet', 'VA', 'Kasir', 'Transfer Bank', 'COD']

@@ -36,11 +36,11 @@ def _upsert_ai_output(engine, df_publish: pd.DataFrame):
     cols = [
         "contract_no", "cust_id", "recovery_score", "confidence_level", "confidence_category",
         "risk_segment", "nba_recommendation", "priority_level", "scoring_date", "updated_at",
-        "self_cure_probability", "roll_forward_risk", "ptp_success_probability",
+        "self_cure_probability", "roll_forward_risk", "ptp_success_probability", "nba_trigger",
     ]
-    
+
     # Fill missing new columns with NULL for fallback if they don't exist
-    for c in ["self_cure_probability", "roll_forward_risk", "ptp_success_probability"]:
+    for c in ["self_cure_probability", "roll_forward_risk", "ptp_success_probability", "nba_trigger"]:
         if c not in df_publish.columns:
             df_publish[c] = None
 

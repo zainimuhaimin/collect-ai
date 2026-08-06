@@ -1,6 +1,7 @@
 import AppLayout from '../layouts/AppLayout';
 import WeightSlider from '../components/WeightSlider';
 import ModelLogTable from '../components/ModelLogTable';
+import LlmSystemPromptCard from '../components/LlmSystemPromptCard';
 import ProgressBar from '../components/ProgressBar';
 import AiIntelligenceSkeleton from '../components/skeletons/AiIntelligenceSkeleton';
 import ErrorState from '../components/ErrorState';
@@ -236,6 +237,8 @@ export default function AiIntelligencePage({ className = '' }: AiIntelligencePag
             </div>
           </div>
         </div>
+
+        <LlmSystemPromptCard />
 
         <div className="bg-surface-container-lowest dark:bg-surface-container-high/10 border border-outline-variant dark:border-outline-variant/30 rounded-xl p-6">
           <p className="text-label-lg font-semibold text-on-surface dark:text-on-background mb-4">Operational Log (Aktivitas Model)</p>

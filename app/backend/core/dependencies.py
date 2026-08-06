@@ -18,6 +18,7 @@ from core.config import settings
 from domain.models import User
 from repositories.interfaces import (
     IAiIntelligenceSyncRepository,
+    IAiReasoningRepository,
     IContractRepository,
     ICustomerRepository,
     IDashboardRepository,
@@ -26,6 +27,7 @@ from repositories.interfaces import (
     IUserRepository,
 )
 from repositories.ai_intelligence_sync_repository import AiIntelligenceSyncRepository
+from repositories.ai_reasoning_repository import AiReasoningRepository
 from repositories.contract_repository import ContractRepository
 from repositories.customer_repository import CustomerRepository
 from repositories.dashboard_repository import DashboardRepository
@@ -33,6 +35,7 @@ from repositories.governance_repository import GovernanceConfigRepository
 from repositories.restructuring_offer_repository import RestructuringOfferRepository
 from repositories.user_repository import UserRepository
 from services.ai_intelligence_sync_service import AiIntelligenceSyncService
+from services.ai_reasoning_service import AiReasoningService, build_gemini_client
 from services.auth_service import AuthService
 from services.customer_service import CustomerService
 from services.contract_service import ContractService
@@ -80,6 +83,11 @@ def get_governance_repository() -> IGovernanceConfigRepository:
 @lru_cache
 def get_ai_intelligence_sync_repository() -> IAiIntelligenceSyncRepository:
     return AiIntelligenceSyncRepository(get_engine())
+
+
+@lru_cache
+def get_ai_reasoning_repository() -> IAiReasoningRepository:
+    return AiReasoningRepository(get_engine())
 
 
 # NOTE: repository di-inject lewat Depends() di sini (bukan dipanggil
@@ -140,6 +148,18 @@ def get_auth_service(
     user_repo: IUserRepository = Depends(get_user_repository),
 ) -> AuthService:
     return AuthService(user_repo)
+
+
+# NOTE: SENGAJA tidak di-@lru_cache — GeminiClient dibuat baru tiap request
+# (murah, tidak ada I/O di constructor-nya) supaya perubahan
+# GOOGLE_AI_STUDIO_API_KEYS/AI_REASONING_ENABLED di .env langsung berlaku
+# tanpa perlu restart proses backend untuk membersihkan cache lru_cache.
+def get_ai_reasoning_service(
+    customer_repo: ICustomerRepository = Depends(get_customer_repository),
+    contract_repo: IContractRepository = Depends(get_contract_repository),
+    ai_reasoning_repo: IAiReasoningRepository = Depends(get_ai_reasoning_repository),
+) -> AiReasoningService:
+    return AiReasoningService(customer_repo, contract_repo, ai_reasoning_repo, build_gemini_client())
 
 
 # auto_error=False WAJIB: default HTTPBearer() (auto_error=True) melempar 403

@@ -95,7 +95,7 @@ src/
 │   └── staticContent.ts    #   item nav (5 menu), badge compliance, copy login
 ├── domains/                # ← inti organisasi kode, lihat di bawah
 │   ├── auth/  dashboard/  customer/  contract/
-│   ├── restructuring/  ai-intelligence/
+│   ├── restructuring/  ai-intelligence/  ai-reasoning/
 │   └── shared/riskSegment.ts   # enum 4 risk segment + tone chip-nya
 ├── hooks/                  # 6 hook lintas domain (debounce, pagination, dst)
 ├── layouts/
@@ -158,8 +158,12 @@ Default React Query (`src/api/queryClient.ts`): query `staleTime: 30_000`,
 `refetchOnWindowFocus: false`, `retry: 1`; mutation `retry: 0`.
 
 > Perlu diketahui saat menambah endpoint yang lambat: timeout 10 detik itu
-> **global**. Endpoint yang butuh lebih lama (misal pemanggilan LLM) wajib
-> memberi override `timeout` per-request, atau memakai pola `202` + polling.
+> **global**. Endpoint yang butuh lebih lama wajib memberi override `timeout`
+> per-request, atau memakai pola `202` + polling. Contoh nyata:
+> `domains/ai-reasoning/aiReasoning.api.ts::generateAiReasoning()` mengoverride
+> jadi 30 detik (panggilan Gemini di backend bisa sampai ~25 detik) — dipilih
+> override per-request di sini, BUKAN `202`+poll seperti Sync, karena target
+> latensinya jauh lebih pendek dan tidak perlu progress step granular.
 
 ---
 
@@ -236,7 +240,7 @@ VITE_ENABLE_MSW=true npm run dev
 ```
 
 - Handler ada di `src/mocks/handlers/` (customer, dashboard, contract,
-  restructuring, ai-intelligence), fixture di `src/mocks/fixtures/`.
+  restructuring, ai-intelligence, ai-reasoning), fixture di `src/mocks/fixtures/`.
 - Beberapa fixture bersifat *stateful* — misal `advanceSyncFixture()` memajukan
   status job Sync tiap kali di-poll, sehingga alur loading bisa diuji.
 - `auth.handlers.ts` **sengaja tidak dimasukkan** ke agregat handler: auth sudah

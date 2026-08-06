@@ -1,0 +1,168 @@
+{
+  "model_types": {
+    "recovery": {
+      "current_champion": {
+        "version": "v2",
+        "path": "/Users/mcdmobiledev11/Development/MCD/collect-ai/app/machine-learning/models/recovery_model_champion.pkl",
+        "role": "champion",
+        "model_type": "recovery",
+        "registered": "2026-08-06T11:24:25.211913",
+        "strategy": "recency_weighted",
+        "n_samples": 2918,
+        "auc": 0.8016,
+        "decay_rate": 0.7,
+        "trained_at": "2026-08-06T11:24:25.197968"
+      },
+      "current_challenger": null,
+      "history": [
+        {
+          "version": "v1",
+          "path": "/Users/mcdmobiledev11/Development/MCD/collect-ai/app/machine-learning/models/recovery_model_champion.pkl",
+          "role": "champion",
+          "model_type": "recovery",
+          "registered": "2026-08-05T16:14:30.701117",
+          "strategy": "recency_weighted",
+          "n_samples": 2918,
+          "auc": 0.7983,
+          "decay_rate": 0.7,
+          "trained_at": "2026-08-05T16:14:30.691510"
+        },
+        {
+          "version": "v2",
+          "path": "/Users/mcdmobiledev11/Development/MCD/collect-ai/app/machine-learning/models/recovery_model_champion.pkl",
+          "role": "champion",
+          "model_type": "recovery",
+          "registered": "2026-08-06T11:24:25.211913",
+          "strategy": "recency_weighted",
+          "n_samples": 2918,
+          "auc": 0.8016,
+          "decay_rate": 0.7,
+          "trained_at": "2026-08-06T11:24:25.197968"
+        }
+      ]
+    },
+    "self_cure": {
+      "current_champion": {
+        "version": "v2",
+        "path": "/Users/mcdmobiledev11/Development/MCD/collect-ai/app/machine-learning/models/self_cure_model_challenger.pkl",
+        "role": "champion",
+        "model_type": "self_cure",
+        "registered": "2026-08-06T11:26:01.257474",
+        "strategy": "recency_weighted",
+        "n_samples": 1733,
+        "auc": 0.6941,
+        "decay_rate": 0.7,
+        "trained_at": "2026-08-06T11:24:34.957870"
+      },
+      "current_challenger": null,
+      "history": [
+        {
+          "version": "v1",
+          "path": "/Users/mcdmobiledev11/Development/MCD/collect-ai/app/machine-learning/models/self_cure_model.pkl",
+          "role": "champion",
+          "model_type": "self_cure",
+          "registered": "2026-08-05T16:14:46.099243",
+          "strategy": "recency_weighted",
+          "n_samples": 1728,
+          "auc": 0.7037,
+          "decay_rate": 0.7,
+          "trained_at": "2026-08-05T16:14:46.091885"
+        },
+        {
+          "version": "v2",
+          "path": "/Users/mcdmobiledev11/Development/MCD/collect-ai/app/machine-learning/models/self_cure_model_challenger.pkl",
+          "role": "challenger",
+          "model_type": "self_cure",
+          "registered": "2026-08-06T11:24:34.964885",
+          "strategy": "recency_weighted",
+          "n_samples": 1733,
+          "auc": 0.6941,
+          "decay_rate": 0.7,
+          "trained_at": "2026-08-06T11:24:34.957870"
+        }
+      ]
+    },
+    "roll_forward": {
+      "current_champion": {
+        "version": "v2",
+        "path": "/Users/mcdmobiledev11/Development/MCD/collect-ai/app/machine-learning/models/roll_forward_model_challenger.pkl",
+        "role": "champion",
+        "model_type": "roll_forward",
+        "registered": "2026-08-06T11:26:01.261851",
+        "strategy": "recency_weighted",
+        "n_samples": 1669,
+        "auc": 0.6469,
+        "decay_rate": 0.7,
+        "trained_at": "2026-08-06T11:24:45.935918"
+      },
+      "current_challenger": null,
+      "history": [
+        {
+          "version": "v1",
+          "path": "/Users/mcdmobiledev11/Development/MCD/collect-ai/app/machine-learning/models/roll_forward_model.pkl",
+          "role": "champion",
+          "model_type": "roll_forward",
+          "registered": "2026-08-05T16:15:01.960569",
+          "strategy": "recency_weighted",
+          "n_samples": 1673,
+          "auc": 0.6763,
+          "decay_rate": 0.7,
+          "trained_at": "2026-08-05T16:15:01.953161"
+        },
+        {
+          "version": "v2",
+          "path": "/Users/mcdmobiledev11/Development/MCD/collect-ai/app/machine-learning/models/roll_forward_model_challenger.pkl",
+          "role": "challenger",
+          "model_type": "roll_forward",
+          "registered": "2026-08-06T11:24:45.943336",
+          "strategy": "recency_weighted",
+          "n_samples": 1669,
+          "auc": 0.6469,
+          "decay_rate": 0.7,
+          "trained_at": "2026-08-06T11:24:45.935918"
+        }
+      ]
+    },
+    "ptp_success": {
+      "current_champion": {
+        "version": "v2",
+        "path": "/Users/mcdmobiledev11/Development/MCD/collect-ai/app/machine-learning/models/ptp_success_model_challenger.pkl",
+        "role": "champion",
+        "model_type": "ptp_success",
+        "registered": "2026-08-06T11:26:01.266218",
+        "strategy": "recency_weighted",
+        "n_samples": 2528,
+        "auc": 0.7235,
+        "decay_rate": 0.7,
+        "trained_at": "2026-08-06T11:24:56.102392"
+      },
+      "current_challenger": null,
+      "history": [
+        {
+          "version": "v1",
+          "path": "/Users/mcdmobiledev11/Development/MCD/collect-ai/app/machine-learning/models/ptp_success_model.pkl",
+          "role": "champion",
+          "model_type": "ptp_success",
+          "registered": "2026-08-05T16:15:12.036058",
+          "strategy": "recency_weighted",
+          "n_samples": 2503,
+          "auc": 0.7305,
+          "decay_rate": 0.7,
+          "trained_at": "2026-08-05T16:15:12.029496"
+        },
+        {
+          "version": "v2",
+          "path": "/Users/mcdmobiledev11/Development/MCD/collect-ai/app/machine-learning/models/ptp_success_model_challenger.pkl",
+          "role": "challenger",
+          "model_type": "ptp_success",
+          "registered": "2026-08-06T11:24:56.109676",
+          "strategy": "recency_weighted",
+          "n_samples": 2528,
+          "auc": 0.7235,
+          "decay_rate": 0.7,
+          "trained_at": "2026-08-06T11:24:56.102392"
+        }
+      ]
+    }
+  }
+}

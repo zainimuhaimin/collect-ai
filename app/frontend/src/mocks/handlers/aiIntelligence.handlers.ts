@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import {
   applyWeightingParametersUpdate,
+  llmSystemPromptFixture,
   modelConfigFixture,
   modelOperationalLogFixture,
   startSyncFixture,
@@ -10,6 +11,8 @@ import type { WeightParameter } from '../../domains/ai-intelligence/aiIntelligen
 
 export const aiIntelligenceHandlers = [
   http.get('*/ai-intelligence/model-config', () => HttpResponse.json(modelConfigFixture)),
+
+  http.get('*/ai-intelligence/llm-system-prompt', () => HttpResponse.json(llmSystemPromptFixture)),
 
   http.get('*/ai-intelligence/operational-log', () => HttpResponse.json(modelOperationalLogFixture)),
 

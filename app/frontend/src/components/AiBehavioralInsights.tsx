@@ -20,7 +20,7 @@ export default function AiBehavioralInsights({ customer }: AiBehavioralInsightsP
       <div className="flex items-center justify-between px-5 py-4 border-b border-outline-variant dark:border-outline-variant/30 bg-surface-container-lowest dark:bg-surface-container-high/10">
         <p className="text-label-lg font-semibold text-on-surface dark:text-on-background">AI Behavioral Insights</p>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 p-5">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-5">
         <div>
           <p className="text-label-md text-on-surface-variant dark:text-surface-variant mb-2">Recovery Score</p>
           <span
@@ -62,23 +62,6 @@ export default function AiBehavioralInsights({ customer }: AiBehavioralInsightsP
             tone="primary"
             title={`${ptpSuccessProbabilityPct.toFixed(2)}%`}
           />
-        </div>
-        <div>
-          <p className="text-label-md text-on-surface-variant dark:text-surface-variant mb-2">Target NBA Action</p>
-          {customer.nbaRecommendation ? (
-            <button
-              type="button"
-              className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-primary-container text-on-primary text-label-lg font-semibold"
-            >
-              <span className="material-symbols-outlined text-lg">bolt</span>
-              {customer.nbaRecommendation}
-            </button>
-          ) : (
-            <p className="flex items-center gap-1.5 text-body-md text-on-surface-variant dark:text-surface-variant">
-              <span className="material-symbols-outlined text-lg">info</span>
-              Belum discoring
-            </p>
-          )}
         </div>
       </div>
     </div>

@@ -49,11 +49,25 @@ export const modelConfigResponseSchema = z.object({
 });
 export type ModelConfig = z.infer<typeof modelConfigResponseSchema>;
 
+// GET /ai-intelligence/llm-system-prompt — teks persis yang dikirim sebagai
+// `system_instruction` ke Gemini di setiap panggilan AI Reasoning. Read-only
+// untuk saat ini (lihat komentar LlmSystemPromptSchema di backend).
+export const llmSystemPromptResponseSchema = z.object({
+  promptVersion: z.string(),
+  systemInstruction: z.string(),
+});
+export type LlmSystemPrompt = z.infer<typeof llmSystemPromptResponseSchema>;
+
+// `status` bukan enum terpusat di backend (schemas/governance.py: `status: str`) —
+// setiap action-type menulis vocab statusnya sendiri ke `detail->>'status'`:
+// WEIGHTING_UPDATE/MODEL_SYNC pakai Success/In Progress/Failed, AI_REASONING_GENERATE
+// pakai status ai_reasoning_output (OK/FALLBACK/FAILED/INSUFFICIENT_DATA) — lihat
+// ai_reasoning_service.py::_log_audit. Enum di sini HARUS mencakup superset semuanya.
 export const modelLogEntrySchema = z.object({
   timestamp: z.string(),
   action: z.string(),
   user: z.string().nullable(),
-  status: z.enum(['Success', 'In Progress', 'Failed']),
+  status: z.enum(['Success', 'In Progress', 'Failed', 'OK', 'FALLBACK', 'INSUFFICIENT_DATA']),
 });
 export type ModelLogEntry = z.infer<typeof modelLogEntrySchema>;
 

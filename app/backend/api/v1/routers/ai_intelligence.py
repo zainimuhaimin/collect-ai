@@ -2,28 +2,54 @@ from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from core.config import settings
 from core.dependencies import (
     get_ai_intelligence_sync_service,
+    get_ai_reasoning_repository,
     get_current_user,
     get_governance_service,
 )
 from domain.models import CbsWeight, User
+from repositories.interfaces import IAiReasoningRepository
 from schemas.ai_intelligence_sync import SyncStartResponse, SyncStatusResponse
 from schemas.governance import (
-    AiReasoningHealthPlaceholder,
+    AiReasoningHealthSchema,
     CbsWeightSchema,
+    LlmSystemPromptSchema,
     ModelConfigResponse,
     ModelHealthSchema,
     OperationalLogEntrySchema,
     ScoringModelHealthSchema,
 )
 from services.ai_intelligence_sync_service import AiIntelligenceSyncService
+from services.ai_reasoning_prompt import PROMPT_VERSION, build_instruction
 from services.governance_service import GovernanceService
 
 router = APIRouter(prefix="/ai-intelligence", tags=["ai-intelligence"])
 
 
-def _build_model_health_schema(service: GovernanceService) -> ModelHealthSchema:
+def _build_ai_reasoning_health_schema(ai_reasoning_repo: IAiReasoningRepository) -> AiReasoningHealthSchema:
+    snapshot = ai_reasoning_repo.get_health_snapshot()
+    available = settings.ai_reasoning_enabled and snapshot.total_7d > 0
+    if not settings.ai_reasoning_enabled:
+        note = "Fitur AI Reasoning belum dinyalakan (AI_REASONING_ENABLED=false)."
+    elif snapshot.total_7d == 0:
+        note = "Belum ada aktivitas generate AI Reasoning dalam 7 hari terakhir."
+    else:
+        ok_count = round(snapshot.success_rate_7d * snapshot.total_7d)
+        note = f"{ok_count}/{snapshot.total_7d} generate dalam 7 hari terakhir berhasil (OK/FALLBACK)."
+    return AiReasoningHealthSchema(
+        available=available,
+        note=note,
+        last_generated_at=snapshot.last_generated_at.isoformat() if snapshot.last_generated_at else None,
+        total_7d=snapshot.total_7d,
+        success_rate_7d=snapshot.success_rate_7d,
+    )
+
+
+def _build_model_health_schema(
+    service: GovernanceService, ai_reasoning_repo: IAiReasoningRepository
+) -> ModelHealthSchema:
     health = service.get_model_health()
     scoring_model = None
     if health:
@@ -36,9 +62,10 @@ def _build_model_health_schema(service: GovernanceService) -> ModelHealthSchema:
             retrain_triggered=health.retrain_triggered,
             champion_version=health.champion_version,
         )
-    # ai_reasoning: placeholder murni — ai_reasoning_output belum dibangun,
-    # eksplisit di luar scope TASK-F fase 1 (lihat ai-reasoning-api-upgrade-tasks.md).
-    return ModelHealthSchema(scoring_model=scoring_model, ai_reasoning=AiReasoningHealthPlaceholder())
+    return ModelHealthSchema(
+        scoring_model=scoring_model,
+        ai_reasoning=_build_ai_reasoning_health_schema(ai_reasoning_repo),
+    )
 
 
 @router.get(
@@ -56,12 +83,32 @@ di sini — dihapus dari scope fase ini (lihat frontend-layout-upgrade-tasks.md
 TASK-F).
 """,
 )
-def get_model_config(service: GovernanceService = Depends(get_governance_service)):
+def get_model_config(
+    service: GovernanceService = Depends(get_governance_service),
+    ai_reasoning_repo: IAiReasoningRepository = Depends(get_ai_reasoning_repository),
+):
     weights = service.get_cbs_weights()
     return ModelConfigResponse(
         cbs_weights=[CbsWeightSchema(label=w.label, weight=w.weight, description=w.description) for w in weights],
-        model_health=_build_model_health_schema(service),
+        model_health=_build_model_health_schema(service, ai_reasoning_repo),
     )
+
+
+@router.get(
+    "/llm-system-prompt",
+    response_model=LlmSystemPromptSchema,
+    summary="Teks system instruction yang dikirim ke Gemini (AI Reasoning)",
+    description="""
+Teks persis yang dikirim sebagai `system_instruction` di setiap panggilan
+Gemini untuk fitur AI Reasoning (lihat `services/ai_reasoning_prompt.py::build_instruction()`
+dan `ai-reasoning-prompt-spec.md` di root repo untuk kontrak lengkapnya).
+
+**Read-only untuk saat ini** — belum ada `config_key` di `model_governance_config`
+untuk prompt ini, jadi belum bisa diedit lewat UI tanpa deploy kode baru.
+""",
+)
+def get_llm_system_prompt():
+    return LlmSystemPromptSchema(prompt_version=PROMPT_VERSION, system_instruction=build_instruction())
 
 
 @router.put(

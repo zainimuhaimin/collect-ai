@@ -175,8 +175,8 @@ Collection activity timeline for one contract — **one endpoint, two consumers*
   },
   {
     "id": "CTR-00001-1-log-1",
-    "icon": "sms",
-    "title": "Automated SMS Sent",
+    "icon": "chat",
+    "title": "Automated WA Sent",
     "timestamp": "20 Jul 2026, 09:15 AM",
     "description": "Pengingat jatuh tempo tagihan kontrak CTR-00001-1 dikirim ke nasabah.",
     "tone": "default",
@@ -195,7 +195,7 @@ Collection activity timeline for one contract — **one endpoint, two consumers*
 | `tone` | `"default" \| "danger"` | yes | `"danger"` renders red (broken promises/failures). |
 | `meta` | object | no | Optional highlighted callout: `{ label, value, tone: "success" \| "danger" }`. |
 
-**Source tables:** `lkp_interaction` (SMS/calls/contact attempts, broken PTP) and (for the "Account Assigned to Internal Team" style entries) whatever internal-assignment log the backend maintains, if any.
+**Source tables:** `lkp_interaction` (WA/calls/contact attempts, broken PTP) and (for the "Account Assigned to Internal Team" style entries) whatever internal-assignment log the backend maintains, if any.
 
 ---
 

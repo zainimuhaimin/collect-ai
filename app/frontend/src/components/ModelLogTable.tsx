@@ -10,6 +10,9 @@ const STATUS_TONE: Record<ModelLogEntry['status'], 'success' | 'medium' | 'dange
   Success: 'success',
   'In Progress': 'medium',
   Failed: 'danger',
+  OK: 'success',
+  FALLBACK: 'medium',
+  INSUFFICIENT_DATA: 'medium',
 };
 
 export default function ModelLogTable({ entries }: ModelLogTableProps) {

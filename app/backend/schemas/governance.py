@@ -43,18 +43,31 @@ class ScoringModelHealthSchema(BaseModel):
     champion_version: Optional[str]
 
 
-class AiReasoningHealthPlaceholder(BaseModel):
+class AiReasoningHealthSchema(BaseModel):
+    """`ai_reasoning_output` sudah dibangun — ini bukan placeholder lagi.
+    `available` = fitur menyala (AI_REASONING_ENABLED=true) DAN sudah pernah
+    ada minimal 1 hasil non-RUNNING dalam 7 hari terakhir. `success_rate_7d`
+    None kalau belum ada aktivitas sama sekali dalam 7 hari (bukan 0% — beda
+    makna, sama prinsipnya dengan kenapa payload AI Reasoning membedakan
+    'tidak ada data' dari '0')."""
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "available": False,
-                "note": "Menunggu ai_reasoning_output — lihat ai-reasoning-api-upgrade-tasks.md",
+                "available": True,
+                "note": "7/9 generate dalam 7 hari terakhir berhasil (OK/FALLBACK).",
+                "last_generated_at": "2026-08-05T10:00:00",
+                "total_7d": 9,
+                "success_rate_7d": 0.7778,
             }
         }
     )
 
-    available: bool = False
-    note: str = "Menunggu ai_reasoning_output — lihat ai-reasoning-api-upgrade-tasks.md"
+    available: bool
+    note: str
+    last_generated_at: Optional[str] = None
+    total_7d: int = 0
+    success_rate_7d: Optional[float] = None
 
 
 class ModelHealthSchema(BaseModel):
@@ -71,8 +84,11 @@ class ModelHealthSchema(BaseModel):
                     "champion_version": "v1",
                 },
                 "ai_reasoning": {
-                    "available": False,
-                    "note": "Menunggu ai_reasoning_output — lihat ai-reasoning-api-upgrade-tasks.md",
+                    "available": True,
+                    "note": "7/9 generate dalam 7 hari terakhir berhasil (OK/FALLBACK).",
+                    "last_generated_at": "2026-08-05T10:00:00",
+                    "total_7d": 9,
+                    "success_rate_7d": 0.7778,
                 },
             }
         }
@@ -81,8 +97,8 @@ class ModelHealthSchema(BaseModel):
     scoring_model: Optional[ScoringModelHealthSchema] = Field(
         description="None kalau model_monitoring_log belum pernah ada baris sama sekali"
     )
-    ai_reasoning: AiReasoningHealthPlaceholder = Field(
-        description="Placeholder — tabel ai_reasoning_output belum dibangun, di luar scope TASK-F fase 1"
+    ai_reasoning: AiReasoningHealthSchema = Field(
+        description="Kesehatan fitur AI Reasoning — lihat AiReasoningHealthSchema"
     )
 
 
@@ -113,8 +129,11 @@ class ModelConfigResponse(BaseModel):
                         "champion_version": "v1",
                     },
                     "ai_reasoning": {
-                        "available": False,
-                        "note": "Menunggu ai_reasoning_output — lihat ai-reasoning-api-upgrade-tasks.md",
+                        "available": True,
+                        "note": "7/9 generate dalam 7 hari terakhir berhasil (OK/FALLBACK).",
+                        "last_generated_at": "2026-08-05T10:00:00",
+                        "total_7d": 9,
+                        "success_rate_7d": 0.7778,
                     },
                 },
             }
@@ -123,6 +142,27 @@ class ModelConfigResponse(BaseModel):
 
     cbs_weights: List[CbsWeightSchema]
     model_health: ModelHealthSchema
+
+
+class LlmSystemPromptSchema(BaseModel):
+    """GET /ai-intelligence/llm-system-prompt — teks instruksi persis yang
+    dikirim ke Gemini di setiap panggilan AI Reasoning (lihat
+    services/ai_reasoning_prompt.py::build_instruction()). Read-only untuk
+    saat ini — mengedit prompt lewat UI butuh menyimpannya di
+    model_governance_config dulu (belum ada config_key untuk ini), jadi
+    endpoint ini sengaja hanya GET."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "prompt_version": "v1",
+                "system_instruction": "Anda analis kredit yang membantu petugas collection...",
+            }
+        }
+    )
+
+    prompt_version: str
+    system_instruction: str
 
 
 class OperationalLogEntrySchema(BaseModel):

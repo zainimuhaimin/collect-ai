@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from api.v1.routers import (
     ai_intelligence,
+    ai_reasoning,
     auth,
     contracts,
     customers,
@@ -18,3 +19,4 @@ api_router.include_router(restructuring.router)
 api_router.include_router(restructuring_groups.router)
 api_router.include_router(dashboard.router)
 api_router.include_router(ai_intelligence.router)
+api_router.include_router(ai_reasoning.router)

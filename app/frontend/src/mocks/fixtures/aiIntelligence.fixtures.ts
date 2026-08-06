@@ -1,6 +1,8 @@
 import {
+  llmSystemPromptResponseSchema,
   modelConfigResponseSchema,
   modelOperationalLogResponseSchema,
+  type LlmSystemPrompt,
   type ModelConfig,
   type ModelLogEntry,
   type WeightParameter,
@@ -35,6 +37,26 @@ export const modelConfigFixture: ModelConfig = {
   },
 };
 
+// Cermin persis dari build_instruction() (app/backend/services/ai_reasoning_prompt.py)
+// — kalau instruksi asli berubah, salin ulang teksnya ke sini juga.
+export const llmSystemPromptFixture: LlmSystemPrompt = {
+  promptVersion: 'v1',
+  systemInstruction: `Anda analis kredit yang membantu petugas collection di perusahaan multifinance Indonesia. Data JSON berikut adalah profil SATU DEBITUR yang mungkin memiliki beberapa kontrak.
+
+Tugas Anda: tentukan SATU strategi penanganan yang konsisten untuk debitur ini sebagai satu orang, bukan rekomendasi terpisah per kontrak.
+
+Aturan wajib:
+- primaryNbaAction HARUS salah satu dari: WA, Deskcoll, Visit, Somasi, Pickup. Hanya SATU — debitur ini satu orang, tidak masuk akal menghubunginya lewat beberapa channel bertentangan di waktu yang sama.
+- Kalau nba_spread pada portfolio_rollup berisi lebih dari satu nilai, itu berarti kontrak-kontraknya punya rekomendasi berbeda. Rekonsiliasi, dan jelaskan alasannya di consistencyNote.
+- Urgensi mengikuti kontrak TERBURUK (field worst_* pada portfolio_rollup), bukan rata-rata.
+- Pertimbangkan collection_sensitivity pada customer_profile sebagai preferensi channel debitur; boleh menyimpang kalau tingkat keparahan menuntut, tapi sebutkan alasannya.
+- payment_history di setiap kontrak hanya mencatat pembayaran yang TERJADI; angsuran yang tidak dibayar TIDAK muncul sebagai baris. Nilai tunggakan dari dpd_current dan overdue_installment_count pada kontrak, JANGAN disimpulkan dari jumlah baris pembayaran.
+- nba_recommendation per kontrak adalah hasil rule engine deterministik dengan cakupan terbatas — ia tidak pernah menghasilkan "Pickup", dan tidak mempertimbangkan portofolio debitur secara keseluruhan. Perlakukan sebagai rekomendasi sistem saat ini yang perlu Anda rekonsiliasi, BUKAN sebagai batas atas tindakan yang boleh Anda usulkan. nba_trigger menjelaskan kondisi apa yang memicu rekomendasi itu — nilai apakah alasannya masih berlaku ketika seluruh kontrak debitur dilihat bersamaan.
+- Field yang TIDAK ADA di JSON berarti tidak tersedia — jangan diasumsikan nol, dan jangan mengarang angka yang tidak ada di input. available_models memberi tahu model skor apa yang tersedia; skor dari model yang tidak terdaftar memang tidak ada, bukan bernilai rendah.
+
+Jawab dalam Bahasa Indonesia, ringkas, berbasis data yang diberikan.`,
+};
+
 export const modelOperationalLogFixture: ModelLogEntry[] = [
   { timestamp: '2026-07-24 14:22:10', action: 'Payment Rate Weight Adjustment', user: 'admin_irwan', status: 'Success' },
   { timestamp: '2026-07-23 12:05:45', action: 'Delay Score Weight Adjustment', user: 'admin_irwan', status: 'Success' },
@@ -44,6 +66,7 @@ export const modelOperationalLogFixture: ModelLogEntry[] = [
 if (import.meta.env.DEV) {
   modelConfigResponseSchema.parse(modelConfigFixture);
   modelOperationalLogResponseSchema.parse(modelOperationalLogFixture);
+  llmSystemPromptResponseSchema.parse(llmSystemPromptFixture);
 }
 
 // Mutable in-memory store so the PUT handler can persist edits across refetches within

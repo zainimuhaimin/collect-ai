@@ -9,6 +9,7 @@ export const queryKeys = {
     modelConfig: ['aiIntelligence', 'modelConfig'] as const,
     operationalLog: ['aiIntelligence', 'operationalLog'] as const,
     syncStatus: ['aiIntelligence', 'syncStatus'] as const,
+    llmSystemPrompt: ['aiIntelligence', 'llmSystemPrompt'] as const,
   },
   customer: {
     detail: (customerId: string) => ['customer', customerId, 'detail'] as const,
@@ -27,5 +28,8 @@ export const queryKeys = {
     groups: (status: string, search: string, page: number, pageSize: number) =>
       ['restructuring', 'groups', status, search, page, pageSize] as const,
     groupDetail: (groupId: string) => ['restructuring', 'groups', 'detail', groupId] as const,
+  },
+  aiReasoning: {
+    detail: (customerId: string) => ['aiReasoning', customerId] as const,
   },
 } as const;

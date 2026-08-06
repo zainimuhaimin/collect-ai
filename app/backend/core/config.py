@@ -39,6 +39,24 @@ class Settings(BaseSettings):
     # kedua app tetap bisa dipisah venv-nya nanti tanpa ubah kode.
     ml_python_interpreter: str = ""
 
+    # AI Reasoning (ai-reasoning-api-upgrade-tasks.md) — LLM eksternal (Google
+    # AI Studio/Gemini) untuk kartu narasi hyper-personalization di Customer
+    # Detail. Beberapa key didukung sekaligus untuk rotasi otomatis saat quota
+    # salah satu key habis (lihat services/gemini_client.py) — TIDAK menambah
+    # dependency SDK baru, httpx yang sudah ada cukup untuk REST + responseSchema.
+    # Default `ai_reasoning_enabled=False`: key yang belum diisi harus
+    # menghasilkan respons "disabled" yang bersih, bukan error 500.
+    google_ai_studio_api_keys: list[str] = []
+    gemini_model: str = "gemini-2.0-flash"
+    gemini_timeout_seconds: float = 25.0   # HARUS < timeout klien (30s) — backend
+                                            # menyerah dulu, bukan browser yang
+                                            # menutup koneksi lebih dulu
+    ai_reasoning_enabled: bool = False
+    ai_reasoning_daily_call_limit: int = 300
+    ai_reasoning_max_key_rotation_attempts: int = 3   # cap, bukan len(keys) —
+                                                       # cegah latensi menumpuk
+                                                       # kalau key dikonfigurasi banyak
+
     @property
     def database_url(self) -> str:
         return f"postgresql://{self.pguser}:{self.pgpassword}@{self.pghost}:{self.pgport}/{self.pgdatabase}"

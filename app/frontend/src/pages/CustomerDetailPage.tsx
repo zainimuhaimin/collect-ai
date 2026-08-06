@@ -3,6 +3,7 @@ import AppLayout from '../layouts/AppLayout';
 import Avatar from '../components/Avatar';
 import CustomerSummaryCards from '../components/CustomerSummaryCards';
 import AiBehavioralInsights from '../components/AiBehavioralInsights';
+import AiReasoningCard from '../components/AiReasoningCard';
 import RestructuringOptionsCard from '../components/RestructuringOptionsCard';
 import CustomerContractsList from '../components/CustomerContractsList';
 import CustomerDetailSkeleton from '../components/skeletons/CustomerDetailSkeleton';
@@ -81,6 +82,8 @@ export default function CustomerDetailPage({ className = '' }: CustomerDetailPag
         <CustomerSummaryCards customer={customer} />
 
         <AiBehavioralInsights customer={customer} />
+
+        <AiReasoningCard custId={customer.custId} />
 
         <RestructuringOptionsCard custId={customer.custId} assessment={restructuringQuery.data} />
 

@@ -91,6 +91,8 @@ pip install -r requirements.txt
 #    macOS: brew install libomp   (XGBoost butuh OpenMP runtime)
 
 # 2. Schema database
+#    (untuk init dari nol seluruh project sekaligus, cukup jalankan ../../schema.sql
+#    dari root — file ini + tabel backend sudah tergabung di sana)
 psql -d collect_ai -f config/schema_combined.sql
 
 # 3. Data sintetis (dari root repo)
@@ -126,9 +128,11 @@ penambahan kolom dilakukan dengan `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`.
 
 | File | Isi |
 |---|---|
-| `config/schema_combined.sql` | **Pakai ini.** Gabungan seluruh versi — 4 tabel input + tabel output ML + tabel restrukturisasi |
+| `config/schema_combined.sql` | **Pakai ini** untuk instalasi fresh ML saja. Untuk init seluruh project sekaligus (ML + backend), pakai `schema.sql` di root repo — gabungan file ini + `app/backend/db/schema_*.sql` |
 | `config/schema.sql` | Versi awal (historis) |
 | `config/schema_v2.sql` · `v3` · `v4` | Penambahan bertahap (`v3`: `cust_name`, `v4`: `contract_snapshot.status`) |
+| `config/schema_v5.sql` | `historical_default_count`/`income_debt_ratio` (dulu selalu 0, lihat batasan #1) + `ai_intelligence_output.nba_trigger` (cabang NBA mana yang menang) |
+| `config/schema_v6.sql` | Hapus channel `SMS`, lebur ke `WA` (lihat batasan #3) |
 
 ---
 
@@ -142,7 +146,8 @@ app/machine-learning/
 ├── src/
 │   ├── feature_engineering.py   # ekstraksi fitur + guard anti-leakage
 │   ├── cbs_builder.py           # Customer Behavioral Standing
-│   ├── business_rules.py        # risk segment, NBA, priority, CHANNEL_RANK
+│   ├── business_rules.py        # risk segment, NBA + nba_trigger (cabang mana yang
+│   │                             # menang), priority, CHANNEL_RANK
 │   ├── scoring_engine.py        # inferensi + run_quality_check()
 │   ├── outcome_labeler.py       # actual_paid + pelabelan skor historis
 │   ├── retrain_strategies.py    # full / rolling window / recency-weighted + grouped CV
@@ -326,18 +331,18 @@ pytest tests/ -q      # 155 test, TIDAK butuh database
 
 ## Batasan yang diketahui
 
-1. **Empat fitur selalu bernilai 0** di training maupun scoring: `delay_trend`,
-   `historical_default_count`, `income_debt_ratio`, `broken_ptp_count` — karena
-   `out_cols` di `cbs_builder.build_cbs()` tidak pernah mengembalikannya. Tidak
-   ada jumlah data yang bisa memperbaiki ini.
+1. **Dua fitur selalu bernilai 0** di training maupun scoring: `delay_trend`,
+   `broken_ptp_count` — karena `out_cols` di `cbs_builder.build_cbs()` tidak
+   pernah mengembalikannya. Tidak ada jumlah data yang bisa memperbaiki ini.
+   (`historical_default_count`/`income_debt_ratio` **sudah diperbaiki** di
+   `schema_v5.sql` — keduanya sudah dihitung benar sejak awal di
+   `compute_customer_features()`, hanya dibuang di `out_cols`; NBA `Pickup`
+   sekarang bisa terpicu.)
 2. **`restructure_count` selalu 0** — satu-satunya yang menghitungnya,
    `cbs_builder.update_cbs()`, tidak punya pemanggil produksi.
-3. **`SMS` hilang dari dua peta ranking channel** (`feature_engineering.py` dan
-   `business_rules.py::CHANNEL_RANK`) padahal SMS channel nyata (~35% interaksi
-   bucket C0). Akibatnya override `collection_sensitivity` mati diam-diam untuk
-   nasabah yang paling responsif via SMS. `RECOVERY_SOURCE_MAP` justru
-   menyertakan `sms` tapi dengan ordinal berbeda — tiga peta yang saling tidak
-   konsisten.
+3. ~~`SMS` hilang dari dua peta ranking channel~~ — **sudah diperbaiki**
+   (`schema_v6.sql`): channel `SMS` dihapus sepenuhnya dari sistem, dilebur ke
+   `WA`. `RECOVERY_SOURCE_MAP` sekarang selaras dengan `CHANNEL_RANK`.
 4. **`XGB_N_ESTIMATORS=500, XGB_MAX_DEPTH=6` over-parameterized** untuk ~2.900
    baris / 36 fitur. Terlihat dari *placebo test*: bahkan dengan label acak,
    model `recovery` masih menunjukkan AUC di atas 0.50.

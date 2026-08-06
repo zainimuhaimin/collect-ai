@@ -1,6 +1,7 @@
 import { apiClient, apiRequest } from '../../api/client';
 import { snakeToCamelDeep } from '../../api/caseTransform';
 import {
+  llmSystemPromptResponseSchema,
   modelConfigResponseSchema,
   modelOperationalLogResponseSchema,
   saveWeightingParametersResponseSchema,
@@ -11,6 +12,14 @@ import {
 
 export function getModelConfig() {
   return apiRequest(apiClient.get('ai-intelligence/model-config'), modelConfigResponseSchema, snakeToCamelDeep);
+}
+
+export function getLlmSystemPrompt() {
+  return apiRequest(
+    apiClient.get('ai-intelligence/llm-system-prompt'),
+    llmSystemPromptResponseSchema,
+    snakeToCamelDeep,
+  );
 }
 
 export function getModelOperationalLog() {

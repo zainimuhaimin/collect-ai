@@ -518,10 +518,16 @@ def test_ai_intelligence_model_config():
     body = r.json()
     assert len(body["cbs_weights"]) == 4
     assert abs(sum(w["weight"] for w in body["cbs_weights"]) - 100) < 0.01
-    assert body["model_health"]["ai_reasoning"] == {
-        "available": False,
-        "note": "Menunggu ai_reasoning_output — lihat ai-reasoning-api-upgrade-tasks.md",
-    }
+    # ai_reasoning_output sudah dibangun (ai-reasoning-api-upgrade-tasks.md) —
+    # bukan placeholder statis lagi, jadi hanya bentuk & tipe field yang
+    # dites di sini, bukan nilai pasti (bergantung AI_REASONING_ENABLED dan
+    # histori baris 7 hari terakhir, yang bisa berbeda-beda per environment).
+    ai_reasoning = body["model_health"]["ai_reasoning"]
+    assert isinstance(ai_reasoning["available"], bool)
+    assert isinstance(ai_reasoning["note"], str) and ai_reasoning["note"]
+    assert "last_generated_at" in ai_reasoning
+    assert isinstance(ai_reasoning["total_7d"], int)
+    assert ai_reasoning["success_rate_7d"] is None or isinstance(ai_reasoning["success_rate_7d"], float)
 
 
 def test_ai_intelligence_weighting_parameters_valid_sum(governance_auth_token):

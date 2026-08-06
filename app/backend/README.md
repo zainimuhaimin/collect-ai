@@ -9,10 +9,12 @@ Untuk gambaran keseluruhan sistem (alur data ujung ke ujung, Docker Compose,
 istilah domain), baca [README root](../../README.md) lebih dulu.
 
 > ⚠️ **Belum ada autentikasi pada mayoritas endpoint.** Tidak ada dependency auth
-> global di `main.py` maupun `api/v1/api.py`. Seluruh route `/customers` dan
-> `/contracts` terbuka. `Depends(get_current_user)` hanya dipakai di beberapa
-> route AI Intelligence dan Restructuring Approval, dan di sana pun perannya
-> **audit trail**, bukan gate akses. Lihat [Batasan yang diketahui](#batasan-yang-diketahui).
+> global di `main.py` maupun `api/v1/api.py`. Seluruh route `/customers`,
+> `/contracts`, dan `/customers/{id}/ai-reasoning` terbuka. `Depends(get_current_user)`
+> hanya dipakai di beberapa route AI Intelligence dan Restructuring Approval, dan
+> di sana pun perannya **audit trail**, bukan gate akses. `ai-reasoning` secara
+> khusus lebih berisiko — `POST`-nya memicu panggilan berbayar ke Gemini. Lihat
+> [Batasan yang diketahui](#batasan-yang-diketahui).
 
 ## Arsitektur
 
@@ -29,22 +31,33 @@ app/backend/
 ├── repositories/
 │   ├── interfaces.py               # ICustomerRepository, IContractRepository,
 │   │                                # IDashboardRepository, IRestructuringOfferRepository,
-│   │                                # IGovernanceConfigRepository, IAiIntelligenceSyncRepository
+│   │                                # IGovernanceConfigRepository, IAiIntelligenceSyncRepository,
+│   │                                # IAiReasoningRepository
 │   ├── customer_repository.py      # implementasi Postgres
 │   ├── contract_repository.py      # implementasi Postgres
 │   ├── restructuring_offer_repository.py  # implementasi Postgres
 │   ├── dashboard_repository.py      # implementasi Postgres (TASK-B)
 │   ├── governance_repository.py     # implementasi Postgres (TASK-F fase 1)
-│   └── ai_intelligence_sync_repository.py  # implementasi Postgres (last_scored_at saja)
+│   ├── ai_intelligence_sync_repository.py  # implementasi Postgres (last_scored_at saja)
+│   └── ai_reasoning_repository.py   # implementasi Postgres — cache/staleness,
+│                                      # guarded UPDATE untuk concurrency (try_claim_running)
 ├── services/                       # business logic, depend ke interface saja
-│   └── ai_intelligence_sync_service.py  # job Sync (training-if-missing + scoring), state
-│                                          # in-memory module-level singleton (lihat isi file)
+│   ├── ai_intelligence_sync_service.py  # job Sync (training-if-missing + scoring), state
+│   │                                      # in-memory module-level singleton (lihat isi file)
+│   ├── ai_reasoning_service.py      # orkestrator: cache → limit harian → guard konkurensi
+│   │                                  # → gate kecukupan data → Gemini → validasi → save
+│   ├── ai_reasoning_gate.py         # data_sufficiency() — NO_CBS/TOO_FEW_PAYMENTS/dst
+│   ├── ai_reasoning_payload.py      # rakit payload 3 lapis (profile/portfolio_rollup/contracts)
+│   ├── ai_reasoning_prompt.py       # PROMPT_VERSION, instruksi + response schema Gemini
+│   └── gemini_client.py             # panggilan REST httpx ke Gemini, rotasi multi-API-key
 ├── api/v1/routers/                 # auth, customers, contracts, restructuring,
-│                                     # restructuring_groups, dashboard, ai_intelligence
+│                                     # restructuring_groups, dashboard, ai_intelligence,
+│                                     # ai_reasoning
 │                                     # (health check ada langsung di main.py, GET "/")
 ├── db/
 │   ├── schema_users.sql             # tabel `users` (login/identity)
-│   └── schema_governance.sql        # tabel governance baru (TASK-E/TASK-F)
+│   └── schema_governance.sql        # model_governance_config/audit_log (TASK-E/TASK-F),
+│                                      # restructuring_approval_log, ai_reasoning_output
 └── tests/test_smoke.py             # end-to-end lewat TestClient, DB asli
 ```
 
@@ -73,6 +86,8 @@ pip install -r requirements.txt
 cat ../../.env.example   # copy jadi ../../.env kalau belum ada, isi kredensial asli
 
 # 3. Buat tabel `users` + tabel governance baru (sekali saja, idempotent) + seed 1 dev user
+#    (untuk init dari nol seluruh project sekaligus, cukup jalankan ../../schema.sql
+#    dari root — file ini + schema_combined.sql milik ML sudah tergabung di sana)
 psql -h $PGHOST -U $PGUSER -d $PGDATABASE -f db/schema_users.sql
 psql -h $PGHOST -U $PGUSER -d $PGDATABASE -f db/schema_governance.sql   # model_governance_config,
                                                                          # model_governance_audit_log,
@@ -283,13 +298,19 @@ curl -X PUT http://localhost:8000/api/v1/ai-intelligence/weighting-parameters \
 
 # Audit log semua perubahan config di atas
 curl http://localhost:8000/api/v1/ai-intelligence/operational-log
+
+# Teks persis system_instruction yang dikirim ke Gemini (AI Reasoning) — read-only,
+# belum ada config_key untuk mengeditnya lewat UI
+curl http://localhost:8000/api/v1/ai-intelligence/llm-system-prompt
 ```
 
 Risk & Sub-model Threshold serta Restructuring Policy SENGAJA tidak ada di
 sini — di luar scope fase ini (lihat `frontend-layout-upgrade-tasks.md` TASK-F).
-`ai_reasoning` di `model_health` masih placeholder (`available: false`) —
-`ai_reasoning_output` belum dibangun (`ai-reasoning-api-upgrade-tasks.md`,
-task terpisah, belum digarap).
+`ai_reasoning` di `model_health` sekarang nyata (bukan placeholder lagi) —
+dihitung dari `ai_reasoning_output`: `available` (`AI_REASONING_ENABLED` DAN
+minimal 1 baris `OK`), `total_7d`/`success_rate_7d` (rasio OK+FALLBACK dari
+FAILED 7 hari terakhir), `last_generated_at`. Lihat endpoint AI Reasoning
+di bawah.
 
 ### 13. AI Intelligence — Sync (training-if-missing + scoring)
 
@@ -349,7 +370,55 @@ untuk subprocess ke `app/machine-learning/` bisa di-override lewat env var
 `ML_PYTHON_INTERPRETER` di `.env` (default: interpreter yang sama menjalankan
 backend ini).
 
-### 14. Login
+### 14. AI Reasoning — analisa level-debitur (Gemini)
+
+Grain-nya **DEBITUR** (`cust_id`), bukan kontrak — satu hasil merekonsiliasi
+NBA dari SEMUA kontrak aktif debitur itu jadi satu strategi penanganan.
+Fitur ini mati secara default (`AI_REASONING_ENABLED=false` di `.env`); kalau
+mati, GET/POST tetap `200` dengan `status: "DISABLED"`, tidak pernah `500`.
+
+```bash
+# Baca hasil tersimpan (cache) — tidak memicu panggilan Gemini
+curl http://localhost:8000/api/v1/customers/CUST-00029/ai-reasoning
+
+# Generate baru (atau ambil cache kalau signature kontrak belum berubah)
+curl -X POST http://localhost:8000/api/v1/customers/CUST-00029/ai-reasoning
+```
+
+`status` yang mungkin muncul:
+| Status | Arti |
+|---|---|
+| `NONE` | Belum pernah digenerate untuk debitur ini |
+| `DISABLED` | `AI_REASONING_ENABLED=false` |
+| `RUNNING` | Generate lain untuk debitur ini masih berjalan |
+| `OK` | Hasil asli dari Gemini, sudah divalidasi ulang lewat Pydantic |
+| `FALLBACK` | Gemini gagal (timeout/error/response tidak valid) — ini **template rule-based**, bukan hasil AI. Harus dibedakan visual di frontend |
+| `FAILED` | Fallback pun gagal dibangun |
+| `INSUFFICIENT_DATA` | Data debitur belum cukup (`insufficient_reason`: `NO_CBS`/`TOO_FEW_PAYMENTS`/`NO_SCORE`/`TOO_MANY_CONTRACTS`) — **bukan** error |
+
+Response error non-2xx:
+| Status | Kondisi |
+|---|---|
+| 404 | `cust_id` tidak ditemukan |
+| 409 | Generate lain untuk debitur ini masih `RUNNING` (guarded UPDATE — race-condition-safe, lihat `ai_reasoning_repository.py::try_claim_running`) |
+| 429 | `AI_REASONING_DAILY_CALL_LIMIT` sudah tercapai hari ini |
+
+Cache basi otomatis (`stale: true`) begitu `source_signature` (hash
+`(contract_no, scoring_date)` seluruh kontrak aktif debitur) berubah — skor
+diperbarui, kontrak baru ditambahkan, atau kontrak ditutup. Timeout Gemini
+di-override per-request (`GEMINI_TIMEOUT_SECONDS`, default 25s) — bukan pola
+`202`+poll seperti Sync, karena target latensinya jauh lebih pendek.
+`GOOGLE_AI_STUDIO_API_KEYS` boleh berisi >1 key (array JSON) untuk rotasi
+otomatis saat satu key kena rate limit, dibatasi
+`AI_REASONING_MAX_KEY_ROTATION_ATTEMPTS` supaya latensi terburuk tetap
+terbatas.
+
+Belum ada auth di endpoint ini (lihat peringatan di atas), dan ringkasan
+kontrak lunas 3 tahun terakhir (§8.1 `ai-reasoning-api-upgrade-tasks.md`)
+belum diimplementasikan — keduanya sengaja ditunda, dicatat sebagai
+follow-up di dokumen desain.
+
+### 15. Login
 
 Tidak ada endpoint register publik — user diprovisioning lewat
 `scripts/seed_dev_user.py` (lihat Quick Start di atas untuk setup satu kali).
@@ -364,7 +433,7 @@ Response `200` berisi `token` (bearer, opaque — jangan didekode di frontend)
 dan `user` (`name`/`role`/`initials`). Password salah atau username tidak
 ditemukan -> `401`.
 
-### 15. Profil user yang sedang login
+### 16. Profil user yang sedang login
 
 ```bash
 TOKEN=$(curl -s -X POST http://localhost:8000/api/v1/auth/login \
@@ -397,18 +466,19 @@ berkali-kali tanpa mengganggu data lain di database dev.
 ## Batasan yang diketahui
 
 1. **Mayoritas endpoint tanpa autentikasi.** Tidak ada dependency auth global.
-   Route `/customers` dan `/contracts` — termasuk semua data nasabah — terbuka
-   tanpa token. Yang memakai `Depends(get_current_user)` hanya
+   Route `/customers`, `/contracts`, dan `/customers/{id}/ai-reasoning` —
+   termasuk semua data nasabah dan endpoint yang memicu panggilan berbayar ke
+   Gemini — terbuka tanpa token. Yang memakai `Depends(get_current_user)` hanya
    `PUT /ai-intelligence/weighting-parameters`, `POST /ai-intelligence/sync`, dan
    approve/reject di `/restructuring-groups`; ketiganya didokumentasikan sebagai
    syarat "ada user yang login" untuk audit trail, **bukan** gate role.
 2. **Tidak ada RBAC.** Frontend menampilkan kelima menu ke setiap user yang login,
    termasuk Restructuring Approval dan AI Intelligence.
-3. **`ai_reasoning` di `model_health` masih placeholder** (`available: false`
-   tanpa syarat) — tabel `ai_reasoning_output` belum dibangun. Desainnya ada di
-   `ai-reasoning-api-upgrade-tasks.md` (root repo) dan **belum siap
-   diimplementasikan apa adanya**; baca bagian koreksi audit di dokumen itu
-   sebelum mulai.
+3. **AI Reasoning butuh key Gemini asli untuk berfungsi penuh** —
+   `AI_REASONING_ENABLED=false` secara default supaya instalasi tanpa key tetap
+   dapat respons bersih (`status: "DISABLED"`), bukan `500`. Ringkasan kontrak
+   lunas 3 tahun terakhir (§8.1 dokumen desain) belum diimplementasikan —
+   payload hanya mencakup kontrak aktif.
 4. **AUC di kartu Model Health baru terisi setelah ~30 hari** riwayat scoring —
    itu AUC *live* (skor lampau vs pembayaran nyata sesudahnya), bukan AUC
    cross-validation saat training. `NULL` di instalasi baru adalah perilaku benar,

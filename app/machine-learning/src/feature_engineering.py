@@ -191,7 +191,9 @@ def compute_contract_features(
         else:
             pay_agg['self_cure_rate'] = np.nan
             
-        RECOVERY_SOURCE_MAP = {'wa': 1, 'sms': 2, 'deskcoll': 3, 'visit': 4, 'somasi': 5}
+        # Ordinal aligned with business_rules.py::CHANNEL_RANK (single source of
+        # truth) — SMS removed, merged into WA (decision #7, P0-1).
+        RECOVERY_SOURCE_MAP = {'wa': 1, 'deskcoll': 2, 'visit': 3, 'somasi': 4, 'pickup': 5}
         if 'recovery_source' in p.columns:
             most_effective = (
                 p[p['recovery_source'].notna()]

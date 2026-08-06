@@ -91,19 +91,26 @@ def apply_nba(df: pd.DataFrame, df_cbs: pd.DataFrame | None = None) -> pd.DataFr
     hist_default = pd.to_numeric(out.get("historical_default_count", 0), errors="coerce").fillna(0)
 
     out["nba_recommendation"] = "Deskcoll"
+    # nba_trigger: label singkat cabang TERAKHIR yang menulis nba_recommendation.
+    # apply_nba() menimpa nilainya lewat assignment .loc berurutan (last-write-
+    # wins) — tanpa kolom ini, tidak ada cara mengetahui ALASAN rekomendasi
+    # tanpa merekonstruksi ulang seluruh urutan 8+ assignment dari luar fungsi
+    # ini (dipakai fitur AI Reasoning untuk menilai apakah alasannya masih
+    # berlaku di level debitur — lihat ai-reasoning-api-upgrade-tasks.md §1.1).
+    out["nba_trigger"] = "base:default_deskcoll"
 
-    out.loc[seg == "Self-cure", "nba_recommendation"] = "WA"
-    out.loc[(seg == "Can Pay") & (cycle <= 1), "nba_recommendation"] = "WA"
-    out.loc[(seg == "Can Pay") & (cycle >= 2), "nba_recommendation"] = "Deskcoll"
-    out.loc[(seg == "Cannot Pay") & (cycle <= 1), "nba_recommendation"] = "Deskcoll"
-    out.loc[(seg == "Cannot Pay") & (cycle >= 2), "nba_recommendation"] = "Visit"
+    out.loc[seg == "Self-cure", ["nba_recommendation", "nba_trigger"]] = ["WA", "base:self_cure"]
+    out.loc[(seg == "Can Pay") & (cycle <= 1), ["nba_recommendation", "nba_trigger"]] = ["WA", "base:can_pay_low_cycle"]
+    out.loc[(seg == "Can Pay") & (cycle >= 2), ["nba_recommendation", "nba_trigger"]] = ["Deskcoll", "base:can_pay_high_cycle"]
+    out.loc[(seg == "Cannot Pay") & (cycle <= 1), ["nba_recommendation", "nba_trigger"]] = ["Deskcoll", "base:cannot_pay_low_cycle"]
+    out.loc[(seg == "Cannot Pay") & (cycle >= 2), ["nba_recommendation", "nba_trigger"]] = ["Visit", "base:cannot_pay_high_cycle"]
 
-    out.loc[(seg == "Won't Pay") & (ots < OTS_TIER_RENDAH), "nba_recommendation"] = "Visit"
-    out.loc[(seg == "Won't Pay") & (ots >= OTS_TIER_RENDAH), "nba_recommendation"] = "Somasi"
+    out.loc[(seg == "Won't Pay") & (ots < OTS_TIER_RENDAH), ["nba_recommendation", "nba_trigger"]] = ["Visit", "base:wont_pay_low_ots"]
+    out.loc[(seg == "Won't Pay") & (ots >= OTS_TIER_RENDAH), ["nba_recommendation", "nba_trigger"]] = ["Somasi", "base:wont_pay_mid_ots"]
     out.loc[
         (seg == "Won't Pay") & (ots >= OTS_TIER_TINGGI) & (hist_default >= 2),
-        "nba_recommendation",
-    ] = "Pickup"
+        ["nba_recommendation", "nba_trigger"],
+    ] = ["Pickup", "base:wont_pay_high_ots_repeat_default"]
 
     # CBS sensitivity override: hanya upgrade, tidak boleh downgrade
     if "collection_sensitivity" in out.columns:
@@ -112,25 +119,29 @@ def apply_nba(df: pd.DataFrame, df_cbs: pd.DataFrame | None = None) -> pd.DataFr
         sens_rank = sens.map(CHANNEL_RANK).fillna(0)
         do_override = sens_rank > nba_rank
         out.loc[do_override, "nba_recommendation"] = sens[do_override]
+        out.loc[do_override, "nba_trigger"] = "override:collection_sensitivity"
 
     # Override baru 1: nasabah self-cure tinggi → WA saja
     if "self_cure_probability" in out.columns:
         sc_high = out["self_cure_probability"] >= SELF_CURE_PROB_THRESHOLD
         out.loc[sc_high, "nba_recommendation"] = "WA"
+        out.loc[sc_high, "nba_trigger"] = "override:self_cure_high"
 
     # Override baru 2: RPC rate sangat rendah → Visit untuk verify alamat
     if "rpc_rate" in out.columns:
         rpc_low = out["rpc_rate"] < RPC_RATE_LOW_THRESHOLD
-        
+
         # apply only if current rank < Visit (which is 3)
         nba_r = out["nba_recommendation"].map(CHANNEL_RANK).fillna(0)
         to_visit = rpc_low & (nba_r < 3)
         out.loc[to_visit, "nba_recommendation"] = "Visit"
+        out.loc[to_visit, "nba_trigger"] = "override:rpc_rate_low"
 
     # Override baru 3: near-maturity + saldo kecil → WA cukup
     if "days_to_maturity" in out.columns and "ambc" in out.columns and "installment_amount" in out.columns:
         near_mat = (out["days_to_maturity"] < DAYS_TO_MATURITY_SHORT) & (out["ambc"] < out["installment_amount"] * 2)
         out.loc[near_mat, "nba_recommendation"] = "WA"
+        out.loc[near_mat, "nba_trigger"] = "override:near_maturity_small_balance"
 
     return out
 

@@ -8,7 +8,7 @@ from typing import List, Optional, Tuple
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
-from domain.models import Customer, CustomerListRow, CustomerProfile
+from domain.models import Customer, CustomerBehavioralRaw, CustomerListRow, CustomerProfile
 from repositories.interfaces import ICustomerRepository
 from repositories.priority import PRIORITY_CASE_SQL
 
@@ -187,6 +187,46 @@ class CustomerRepository(ICustomerRepository):
                 {"cust_id": cust_id},
             ).fetchone()
         return row is not None
+
+    def get_behavioral_raw(self, cust_id: str) -> Optional[CustomerBehavioralRaw]:
+        # LEFT JOIN + kolom cbs.* mentah (TANPA COALESCE) — beda sengaja dari
+        # _SELECT di atas yang dipakai get_customer_profile()/_row_to_customer().
+        # active_contract_count/total_active_ots aman di-default 0 (schema-nya
+        # NOT NULL DEFAULT 0, jadi 0 di sana memang berarti nol, bukan "tidak
+        # ada data" — beda dengan behavioral_grade/ptp_reliability_index/
+        # collection_sensitivity/b_list_status yang NULL berarti belum dihitung.
+        query = """
+            SELECT
+                cm.cust_id,
+                (cbs.cust_id IS NOT NULL) AS has_cbs_row,
+                cbs.behavioral_grade,
+                cbs.ptp_reliability_index,
+                cbs.collection_sensitivity,
+                cbs.b_list_status,
+                cbs.active_contract_count,
+                cbs.total_active_ots,
+                cbs.update_timestamp
+            FROM customer_master cm
+            LEFT JOIN customer_behavioral_standing cbs ON cbs.cust_id = cm.cust_id
+            WHERE cm.cust_id = :cust_id
+        """
+        with self._engine.connect() as conn:
+            row = conn.execute(text(query), {"cust_id": cust_id}).fetchone()
+        if not row:
+            return None
+        return CustomerBehavioralRaw(
+            cust_id=row.cust_id,
+            has_cbs_row=bool(row.has_cbs_row),
+            behavioral_grade=row.behavioral_grade,
+            ptp_reliability_index=(
+                float(row.ptp_reliability_index) if row.ptp_reliability_index is not None else None
+            ),
+            collection_sensitivity=row.collection_sensitivity,
+            b_list_status=row.b_list_status,
+            active_contract_count=int(row.active_contract_count or 0),
+            total_active_ots=float(row.total_active_ots or 0),
+            cbs_as_of=row.update_timestamp,
+        )
 
     def list_customers_page(
         self, filter_key: str, search: Optional[str], page: int, page_size: int

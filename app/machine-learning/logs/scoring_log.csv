@@ -1,0 +1,4 @@
+run_at,reference_date,n_scored,wont_pay_pct,self_cure_pct,critical_pct,segment_breakdown,priority_breakdown
+2026-08-05T16:17:55.694909,2026-08-05,2817,0.3071,0.1182,0.3113,"{'Can Pay': 1409, ""Won't Pay"": 865, 'Self-cure': 333, 'Cannot Pay': 210}","{'Medium': 901, 'Critical': 877, 'High': 555, 'Low': 484}"
+2026-08-06T11:24:03.511952,2026-08-06,2817,0.2251,0.1175,0.2602,"{'Can Pay': 1598, ""Won't Pay"": 634, 'Self-cure': 331, 'Cannot Pay': 254}","{'Medium': 981, 'Critical': 733, 'High': 586, 'Low': 517}"
+2026-08-06T11:26:20.749876,2026-08-06,2817,0.3564,0.1115,0.3947,"{""Won't Pay"": 1004, 'Can Pay': 1003, 'Cannot Pay': 496, 'Self-cure': 314}","{'Critical': 1112, 'Medium': 691, 'High': 557, 'Low': 457}"
