@@ -47,7 +47,7 @@ services:
       # terpakai di alur normal — ini hanya jaring pengaman untuk akses langsung
       # ke :8000 (curl/Swagger) dan untuk frontend-dev profile di :5173.
       CORS_ALLOW_ORIGINS: '${CORS_ALLOW_ORIGINS:-["http://localhost","http://localhost:5173"]}'
-      GOOGLE_AI_STUDIO_API_KEYS: ${GOOGLE_AI_STUDIO_API_KEYS:-["AQ.Ab8RN6Ls_i2sV3nXhzY6FzbxSVgEiArNn8E9hPKDBFh6Ch_Ztg"]}
+      GOOGLE_AI_STUDIO_API_KEYS: ${GOOGLE_AI_STUDIO_API_KEYS:-[""]}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.6-flash}
       GEMINI_TIMEOUT_SECONDS: ${GEMINI_TIMEOUT_SECONDS:-25.0}
       AI_REASONING_ENABLED: ${AI_REASONING_ENABLED:-true}
