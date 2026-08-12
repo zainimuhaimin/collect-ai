@@ -260,7 +260,16 @@ collect-ai/
 ├── init_table.sql                # DDL 4 tabel input versi paling awal (historis,
 │                                 #   TIDAK dipakai lagi — pakai schema.sql)
 ├── scripts/
-│   └── reset-demo.sh             #   reset TOTAL (DB + model artifact + log) untuk demo/testing
+│   ├── reset-demo.sh             #   reset TOTAL (DB + model artifact + log) untuk demo/testing
+│   ├── simulate_days.py          #   Area 2 — freeze model di D0, replay hari demi hari
+│   ├── movement_report.py        #   Area 2 — matriks transisi + top-mover dari scoring_history
+│   ├── run_ai_reasoning_eval.py  #   Area 3 — harness evaluasi Tier 1/2/3
+│   ├── evaluate_tier4_oracle.py  #   Area 3 — akurasi vs kunci jawaban tersembunyi (latent oracle)
+│   └── ablation_nba.py           #   Area 3 — uji anchoring rule-NBA pada payload LLM
+├── perf/
+│   ├── benchmark_scale.py        #   Area 1 — sweep skala 5K-5jt customer + stop rule
+│   ├── profile_scoring.py        #   Area 1 — cProfile pipeline scoring
+│   └── results/scale_sweep.csv   #   data mentah hasil sweep
 ├── *.md                          # dokumen desain per fitur — lihat "Peta dokumentasi"
 │
 ├── app/
@@ -385,10 +394,10 @@ di tabel `model_governance_config`, dengan audit trail).
 ## Testing
 
 ```bash
-# Backend — E2E lewat TestClient ke Postgres asli (56 test)
+# Backend — E2E lewat TestClient ke Postgres asli (89 test)
 cd app/backend && pytest tests/ -q
 
-# Machine learning — unit test murni, tidak butuh DB (155 test)
+# Machine learning — unit test murni, tidak butuh DB (168 test)
 cd app/machine-learning && pytest tests/ -q
 
 # Frontend — lint saja; belum ada test runner
@@ -420,6 +429,11 @@ diimplementasikan, beberapa masih rencana:
 | [`frontend-refinement-round2-tasks.md`](frontend-refinement-round2-tasks.md) · [`round4`](frontend-refinement-round4-tasks.md) | Perbaikan UI bertahap | Terimplementasi |
 | [`ai-reasoning-api-upgrade-tasks.md`](ai-reasoning-api-upgrade-tasks.md) | Integrasi LLM (Gemini) untuk narasi analisa level-debitur, hyper-personalization lintas kontrak | Terimplementasi — auth endpoint & ringkasan kontrak lunas 3 tahun masih ditunda |
 | [`ai-reasoning-prompt-spec.md`](ai-reasoning-prompt-spec.md) | Kontrak teknis prompt Gemini: system instruction lengkap, bentuk payload per-debitur, response schema, contoh nyata ujung ke ujung | Referensi — untuk showcase/demo |
+| [`post-presentation-review-tasks.md`](post-presentation-review-tasks.md) | Tindak lanjut review presentasi: uji skalabilitas 5K–5jt customer, simulasi pergerakan data D+1/D+7/D+30, dan harness evaluasi kualitas AI Summary (termasuk ablation anchoring rule NBA) | Terimplementasi — Area 1 (P1-P6) & Area 2 (S1-S4) selesai; Area 3 (E1-E6) sebagian, terbatas kuota API. `TASK-P7` (load test k6) belum |
+| [`performance-report.md`](performance-report.md) | Hasil sweep skala 5K-250K customer TERUKUR + proyeksi ke 5 juta, dampak chunked read pada RAM (Area 1) | Terimplementasi |
+| [`ai-reasoning-evaluation.md`](ai-reasoning-evaluation.md) | Metodologi & hasil evaluasi 4-tier AI Summary + ablasi anchoring (Area 3) | Sebagian — Tier 4 lengkap, Tier 1-3 & ablasi N kecil (kuota API) |
+| [`bahan-presentasi-area-1-2-3.md`](bahan-presentasi-area-1-2-3.md) | Ringkasan siap-presentasi Area 1/2/3 — angka kunci, bullet slide, naskah audiens, antisipasi pertanyaan sulit | Referensi — untuk presentasi |
+| [`TUTORIAL.md`](TUTORIAL.md) | Panduan prosedural langkah-per-langkah: setup dari nol + cara mendemokan Area 1/2/3 | Referensi |
 | [`collect-ai-upgrade.md`](collect-ai-upgrade.md) · [`collection-task.md`](collection-task.md) · [`collection-handoff.md`](collection-handoff.md) | Catatan historis & handoff | Historis |
 
 Dokumentasi kontrak HTTP per modul: [`app/frontend/docs/api/`](app/frontend/docs/api/README.md).

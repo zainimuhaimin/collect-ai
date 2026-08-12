@@ -449,7 +449,7 @@ treat `401` sebagai sinyal logout, lihat `core/dependencies.py`).
 ## Testing
 
 ```bash
-pytest tests/ -q       # 56 test
+pytest tests/ -q       # 89 test
 ```
 
 Semua test jalan terhadap Postgres asli (bukan mock) — test yang butuh

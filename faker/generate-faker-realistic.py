@@ -1098,6 +1098,16 @@ def main(argv=None):
     parser.add_argument('--no-excel', action='store_true')
     parser.add_argument('--dump-latents', action='store_true',
                         help='Write _audit_latents.parquet for the leakage validator')
+    parser.add_argument('--dump-schedule', action='store_true',
+                        help='Write _installment_schedule.parquet (atau tabel '
+                        '{prefix}installment_schedule kalau --no-db tidak dipakai): '
+                        'due_date penuh per angsuran (termasuk yang belum dibayar) — '
+                        'dipakai TASK-S2 (scripts/simulate_days.py) untuk menghitung '
+                        'overdue/DPD dari payment_history yang disuap bertahap.')
+    parser.add_argument('--table-prefix', type=str, default='',
+                        help='Prefiks nama tabel tujuan DB, mis. "stg_" untuk menulis '
+                        'ke stg_customer_master dkk alih-alih tabel live (TASK-S2). '
+                        'Tabel ML derivatif TIDAK ikut di-reset saat prefix dipakai.')
     args = parser.parse_args(argv)
 
     SEED = args.seed
@@ -1164,6 +1174,43 @@ def main(argv=None):
             audit.to_csv(audit_path, index=False)
         print(f"\n✓ Latents (audit only, never loaded to DB): {audit_path}")
 
+    if args.dump_schedule:
+        # Jadwal cicilan PENUH per kontrak, termasuk angsuran yang belum
+        # dibayar — faker biasanya TIDAK menyimpan ini kemana pun (hanya
+        # payment yang benar-benar terjadi jadi baris payment_history).
+        # due_date murni fungsi deterministik (t_cut, phase, months_on_book,
+        # j) lewat _due_date() — TIDAK menyentuh latents (w, c) atau hasil
+        # stokastik apa pun, jadi aman dipakai TASK-S2 tanpa membocorkan
+        # ground truth. j berjalan 1..m (historis, <= t_cut) PLUS SATU
+        # angsuran tambahan (m+1) yang jatuh di jendela label ([t_cut,
+        # as_of]) — persis satu-satunya angsuran "masa depan" yang memang
+        # disimulasikan generator ini (lihat docstring _due_date()), jadi
+        # ini batas horizon yang jujur: simulasi hari-per-hari (S2) hanya
+        # valid sampai `as_of` run ini, tidak lebih.
+        schedule_rows = []
+        for _, term in df_terms.iterrows():
+            m = int(term['months_on_book'])
+            phase = int(term['phase'])
+            installment_amount = term['installment']
+            for j in range(1, m + 2):
+                schedule_rows.append({
+                    'contract_no': term['contract_no'],
+                    'installment_no': j,
+                    'due_date': _due_date(t_cut, phase, m, j).strftime('%Y-%m-%d'),
+                    'installment_amount': installment_amount,
+                })
+        schedule_df = pd.DataFrame(schedule_rows)
+        if args.no_db:
+            schedule_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '_installment_schedule.parquet')
+            try:
+                schedule_df.to_parquet(schedule_path, index=False)
+            except Exception:
+                schedule_path = schedule_path.replace('.parquet', '.csv')
+                schedule_df.to_csv(schedule_path, index=False)
+            print(f"✓ Installment schedule ({len(schedule_df):,} baris, horizon s/d {as_of.isoformat()}): {schedule_path}")
+    else:
+        schedule_df = None
+
     if not args.no_excel:
         print('\nSaving to Excel...')
         excel_filename = 'Dataset_CollectAI_Realistic.xlsx'
@@ -1181,11 +1228,17 @@ def main(argv=None):
             'payment_history': df_payment,
             'lkp_interaction': df_lkp,
         }
+        if args.dump_schedule and schedule_df is not None:
+            db_tables['installment_schedule'] = schedule_df
+        prefix = args.table_prefix
+        is_staging = bool(prefix)
         if args.reset:
-            print('\nResetting target tables...')
-            reset_tables(list(db_tables.keys()), include_derived=True)
-        print('\nSaving to PostgreSQL...')
-        append_dataframes_to_postgres(db_tables, if_exists='append', require_empty=not args.reset)
+            print(f'\nResetting target tables (prefix={prefix!r})...')
+            reset_tables(list(db_tables.keys()), include_derived=not is_staging, table_prefix=prefix)
+        print(f'\nSaving to PostgreSQL (prefix={prefix!r})...')
+        append_dataframes_to_postgres(
+            db_tables, if_exists='append', require_empty=not args.reset, table_prefix=prefix,
+        )
         print('✓ Data loaded to PostgreSQL\n')
 
     print(f"NEXT: run training with reference_date='{as_of.isoformat()}'\n")

@@ -1,0 +1,15 @@
+rung,n_customers,loader,status,break_stage,break_reason,generate_s,train_initial_s,train_self_cure_s,train_roll_forward_s,train_ptp_success_s,daily_scoring_s,peak_rss_generate_mb,peak_rss_train_mb,peak_rss_score_mb,rows_customer,rows_contract,rows_payment,rows_lkp,db_size_bytes,bytes_per_row,started_at
+0,5000,faker_asli,OK,,,10.61,13.96,12.47,13.33,12.38,16.61,,437.9,432.9,5000,7305,70060,149595,88214675,380.3,2026-08-12T03:18:03.030007
+1,10000,faker_asli,OK,,,19.43,23.37,20.69,21.83,21.04,35.89,,726.2,693.9,10000,14531,138094,302324,130051219,279.7,2026-08-12T03:19:23.039429
+0,25000,faker_asli,OK,,,48.69,51.11,47.28,47.65,48.95,129.76,,1417.0,1118.8,25000,36182,344397,755482,239545491,206.3,2026-08-12T03:25:18.978715
+1,50000,bulk_clone,OK,,,50.56,105.19,99.39,95.64,98.55,436.26,,2222.2,2030.7,50000,72667,695508,1519475,529124499,226.3,2026-08-12T03:31:32.795544
+2,100000,,STOPPED_TIMEOUT,/Users/mcdmobiledev11/Development/MCD/collect-ai/.venv/bin/python3 pipelines/daily_scoring.py,exceeded max_stage_seconds=1200,,,,,,,,,,,,,,,,
+0,5000,faker_asli,OK,,,17.64,10.46,7.52,8.68,7.83,11.25,,458.7,493.2,5000,7319,70399,153887,96799891,409.1,2026-08-12T11:18:04.254392
+1,10000,faker_asli,OK,,,34.19,17.11,10.73,13.6,11.49,19.9,,704.9,668.5,10000,14494,139472,304704,144157843,307.6,2026-08-12T11:19:08.414051
+2,25000,faker_asli,OK,,,82.96,25.84,20.1,20.78,21.28,49.63,,1289.1,1284.7,25000,36323,346967,756613,275410067,236.4,2026-08-12T11:20:55.615445
+3,50000,bulk_clone,OK,,,88.46,54.41,37.8,37.25,41.6,96.98,,2167.4,2009.1,50000,72175,688510,1507597,615459987,265.5,2026-08-12T11:24:36.542532
+4,100000,bulk_clone,OK,,,125.0,116.43,85.36,87.23,88.3,209.13,,3322.9,3219.8,100000,146340,1406595,3060675,1232694419,261.5,2026-08-12T11:30:33.568894
+5,250000,,STOPPED_TIMEOUT,/Users/mcdmobiledev11/Development/MCD/collect-ai/.venv/bin/python3 pipelines/train_initial_model.py,exceeded max_stage_seconds=900,,,,,,,,,,,,,,,,
+0,100000,bulk_clone,OK,,,129.87,124.17,93.46,78.34,82.94,185.48,,1013.4,1506.1,100000,145435,1401770,3042430,1200303251,255.9,2026-08-12T15:44:25.164387
+1,250000,bulk_clone,OK,,,240.74,263.33,202.17,223.97,221.42,645.46,,1783.8,2927.0,250000,363888,3468416,7547278,3021024403,259.8,2026-08-12T15:56:01.708375
+2,500000,,STOPPED_TIMEOUT,/Users/mcdmobiledev11/Development/MCD/collect-ai/.venv/bin/python3 pipelines/train_initial_model.py,exceeded max_stage_seconds=900,,,,,,,,,,,,,,,,

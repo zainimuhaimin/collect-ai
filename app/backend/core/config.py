@@ -57,6 +57,19 @@ class Settings(BaseSettings):
                                                        # cegah latensi menumpuk
                                                        # kalau key dikonfigurasi banyak
 
+    # LLM-as-judge (post-presentation-review-tasks.md TASK-E5, Tier 2) — provider
+    # OpenAI-compatible (GLM/Zhipu direkomendasikan, tapi endpoint ini juga
+    # menjangkau DeepSeek/Qwen/OpenRouter/Ollama lokal — hanya beda base URL +
+    # model). SENGAJA beda KELUARGA model dari generator (Gemini) supaya tidak
+    # ada bias self-preference (model cenderung menyukai output dari keluarganya
+    # sendiri). Default `judge_enabled=False`: belum ada key -> evaluasi Tier 2
+    # dilewati dengan status jelas, bukan error 500.
+    judge_enabled: bool = False
+    judge_api_base_url: str = "https://open.bigmodel.cn/api/paas/v4"
+    judge_api_keys: list[str] = []
+    judge_model: str = "glm-4-flash"
+    judge_timeout_seconds: float = 25.0
+
     @property
     def database_url(self) -> str:
         return f"postgresql://{self.pguser}:{self.pgpassword}@{self.pghost}:{self.pgport}/{self.pgdatabase}"

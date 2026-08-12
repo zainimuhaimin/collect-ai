@@ -11,7 +11,7 @@ import { useModelConfigQuery } from '../domains/ai-intelligence/useModelConfigQu
 import { useModelOperationalLogQuery } from '../domains/ai-intelligence/useModelOperationalLogQuery';
 import { useSyncStatusQuery } from '../domains/ai-intelligence/useSyncStatusQuery';
 import { useTriggerSyncMutation } from '../domains/ai-intelligence/useTriggerSyncMutation';
-import { formatDateHuman, formatDateTimeHuman } from '../lib/format';
+import { formatDateHuman, formatDateTimeHuman, formatDurationSeconds } from '../lib/format';
 import type { SyncStep, SyncStepStatus } from '../domains/ai-intelligence/aiIntelligence.schema';
 
 interface AiIntelligencePageProps {
@@ -38,6 +38,11 @@ function StepRow({ step }: { readonly step: SyncStep }) {
       <span className={`material-symbols-outlined text-lg ${STEP_TONE[step.status]}`}>{STEP_ICON[step.status]}</span>
       <span className="text-body-md text-on-surface dark:text-on-background">{step.modelType}</span>
       <span className="text-label-sm text-on-surface-variant dark:text-surface-variant">({step.action})</span>
+      {step.durationS !== null ? (
+        <span className="text-label-sm text-on-surface-variant dark:text-surface-variant">
+          — {formatDurationSeconds(step.durationS)}
+        </span>
+      ) : null}
     </div>
   );
 }

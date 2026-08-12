@@ -1,0 +1,85 @@
+[
+  {
+    "cust_id": "CUST-01476",
+    "nba_spread": [
+      "Somasi"
+    ],
+    "arm_a_action": "Deskcoll",
+    "arm_b_action": "Deskcoll",
+    "arm_a_agrees_rule": false,
+    "arm_b_agrees_rule": false
+  },
+  {
+    "cust_id": "CUST-01457",
+    "nba_spread": [
+      "WA"
+    ],
+    "arm_a_action": "WA",
+    "arm_b_action": "WA",
+    "arm_a_agrees_rule": true,
+    "arm_b_agrees_rule": true
+  },
+  {
+    "cust_id": "CUST-00521",
+    "nba_spread": [
+      "Somasi",
+      "WA"
+    ],
+    "arm_a_action": "Somasi",
+    "arm_b_action": "Somasi",
+    "arm_a_agrees_rule": true,
+    "arm_b_agrees_rule": true
+  },
+  {
+    "cust_id": "CUST-01742",
+    "nba_spread": [
+      "WA"
+    ],
+    "arm_a_action": "WA",
+    "arm_b_action": "WA",
+    "arm_a_agrees_rule": true,
+    "arm_b_agrees_rule": true
+  },
+  {
+    "cust_id": "CUST-00231",
+    "nba_spread": [
+      "Deskcoll",
+      "WA"
+    ],
+    "arm_a_action": "Deskcoll",
+    "arm_b_action": "Deskcoll",
+    "arm_a_agrees_rule": true,
+    "arm_b_agrees_rule": true
+  },
+  {
+    "cust_id": "CUST-01411",
+    "nba_spread": [
+      "WA"
+    ],
+    "arm_a_action": "WA",
+    "arm_b_action": "WA",
+    "arm_a_agrees_rule": true,
+    "arm_b_agrees_rule": true
+  },
+  {
+    "cust_id": "CUST-00830",
+    "nba_spread": [
+      "WA"
+    ],
+    "arm_a_action": "WA",
+    "arm_b_action": "WA",
+    "arm_a_agrees_rule": true,
+    "arm_b_agrees_rule": true
+  },
+  {
+    "cust_id": "CUST-01062",
+    "nba_spread": [
+      "Deskcoll",
+      "WA"
+    ],
+    "arm_a_action": "Deskcoll",
+    "arm_b_action": "WA",
+    "arm_a_agrees_rule": true,
+    "arm_b_agrees_rule": true
+  }
+]

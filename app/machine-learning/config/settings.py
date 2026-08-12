@@ -38,6 +38,15 @@ PTP_DAYS_WINDOW = 7
 DELAY_TREND_WINDOW_MONTHS = 6
 LABEL_WINDOW_DAYS = 30
 
+# TASK-P5 item 1 (chunked read + agregasi) — jumlah customer per batch saat
+# menghitung fitur lewat src/chunked_features.py, alih-alih memuat SELURUH
+# payment_history/lkp_interaction ke pandas sekaligus (dinding RAM sebenarnya
+# di N besar, lihat performance-report.md §4c). 5.000 dipilih sebagai titik
+# tengah: cukup besar supaya overhead per-batch (query SQL, groupby setup)
+# tidak dominan, cukup kecil supaya peak RSS tetap jauh di bawah RAM fisik
+# bahkan di rasio baris terpadat (lkp_interaction ~30 baris/customer, TASK-P4).
+FEATURE_CHUNK_BATCH_SIZE = 5000
+
 # INCOME PROXY — key cocok dengan nilai customer_master.cust_income_level
 INCOME_PROXY = {
     "< 3 Juta":   3_000_000,

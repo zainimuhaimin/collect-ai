@@ -40,6 +40,7 @@ def _grade_from_score(score: float) -> str:
 def build_cbs(
     df_customer_features: pd.DataFrame,
     df_restructure_stats: pd.DataFrame | None = None,
+    reference_date=None,
 ) -> pd.DataFrame:
     """Apply CBS business rules.
 
@@ -51,6 +52,11 @@ def build_cbs(
     rebuild — bukan counter yang di-increment manual, supaya tidak ada risiko
     double-count/idempotency kalau job dijalankan berkali-kali. Default 0/NULL
     kalau tidak disediakan (supaya build_cbs() tetap testable tanpa DB).
+    ``reference_date`` (opsional): dipakai untuk ``update_timestamp`` alih-alih
+    jam dinding, supaya simulasi hari-per-hari (TASK-S2) tidak membocorkan
+    tanggal nyata ke kolom yang seharusnya mengikuti tanggal simulasi
+    (TASK-S3). Default ``datetime.now()`` kalau tidak diberikan (perilaku lama,
+    dipakai call-site yang tidak simulasi tanggal, mis. `train_*.py`).
     Output: DataFrame siap insert ke customer_behavioral_standing.
     """
     df = df_customer_features.copy()
@@ -111,7 +117,7 @@ def build_cbs(
     # ── PTP_RELIABILITY_INDEX: NULL jika belum pernah PTP ────────
     # (sudah NaN dari customer features jika sum_ptp_made = 0)
 
-    df["update_timestamp"] = datetime.now()
+    df["update_timestamp"] = pd.Timestamp(reference_date) if reference_date is not None else datetime.now()
 
     # ── RESTRUCTURE_COUNT / LAST_RESTRUCTURE_DATE (derived) ──────
     if df_restructure_stats is not None and not df_restructure_stats.empty:
@@ -172,17 +178,23 @@ def update_cbs(engine, reference_date=None):
     Preserve B_LIST_STATUS='Y' yang sudah ada.
     """
     from sqlalchemy import text
-    from .feature_engineering import compute_contract_features, compute_customer_features
+    from .chunked_features import compute_features_chunked
+    from config.settings import FEATURE_CHUNK_BATCH_SIZE
 
     df_contract = pd.read_sql("SELECT * FROM contract_snapshot", engine)
-    df_payment = pd.read_sql("SELECT * FROM payment_history", engine)
-    df_lkp = pd.read_sql("SELECT * FROM lkp_interaction", engine)
     df_customer = pd.read_sql("SELECT * FROM customer_master", engine)
 
-    cf = compute_contract_features(df_contract, df_payment, df_lkp, reference_date)
-    custf = compute_customer_features(df_contract, df_payment, df_lkp, df_customer, cf)
+    # TASK-P5 item 1: dipecah per batch cust_id (src/chunked_features.py)
+    # alih-alih memuat SELURUH payment_history/lkp_interaction. pass_customer_
+    # to_contract_features=False: SAMA seperti call asli di sini (TANPA
+    # df_customer) — beda dari train_*.py yang MEMANG mengirim df_customer.
+    cf, custf = compute_features_chunked(
+        engine, df_contract, df_customer, reference_date,
+        batch_size=FEATURE_CHUNK_BATCH_SIZE, need_customer_features=True,
+        pass_customer_to_contract_features=False,
+    )
     restructure_stats = _compute_restructure_stats(engine)
-    cbs_new = build_cbs(custf, restructure_stats)
+    cbs_new = build_cbs(custf, restructure_stats, reference_date=reference_date)
 
     # Preserve B_LIST=Y
     try:
@@ -195,13 +207,13 @@ def update_cbs(engine, reference_date=None):
     except Exception:
         pass
 
-    # UPSERT row-by-row (kompatibel dengan PostgreSQL & SQLite)
+    # DELETE + COPY (TASK-P3) — fallback ke to_sql kalau bukan PostgreSQL
+    # (lihat src/db_write.py::copy_dataframe)
+    from .db_write import copy_dataframe
+
     with engine.begin() as conn:
         conn.execute(text("DELETE FROM customer_behavioral_standing"))
-        cbs_new.to_sql(
-            "customer_behavioral_standing", conn,
-            if_exists="append", index=False,
-        )
+        copy_dataframe(conn, "customer_behavioral_standing", cbs_new)
 
     print(f"[CBS] Updated {len(cbs_new):,} customer profiles")
     return cbs_new

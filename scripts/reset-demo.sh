@@ -65,7 +65,10 @@ TABLES=(
   restructuring_history restructuring_approval_log
   product_conversion_mapping asset_appraisal
   model_governance_config model_governance_audit_log
-  ai_reasoning_output
+  ai_reasoning_output ai_reasoning_evaluation
+  scoring_history
+  stg_customer_master stg_contract_snapshot stg_payment_history
+  stg_lkp_interaction stg_installment_schedule
 )
 if [ "$INCLUDE_USERS" = true ]; then
   TABLES+=(users)

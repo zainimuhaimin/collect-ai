@@ -68,12 +68,12 @@ from src.model_registry import (  # noqa: E402
 # (dibuat dengan menjalankan pipeline training-nya masing-masing).
 SUB_MODEL_TYPES = ["self_cure", "roll_forward", "ptp_success"]
 from src.feature_engineering import (  # noqa: E402
-    compute_contract_features,
-    compute_customer_features,
     enrich_with_cbs,
     filter_restructured_for_training,
 )
 from src.cbs_builder import build_cbs  # noqa: E402
+from src.chunked_features import compute_features_chunked  # noqa: E402
+from config.settings import FEATURE_CHUNK_BATCH_SIZE  # noqa: E402
 
 
 # ── HELPERS ────────────────────────────────────────────────────────
@@ -351,15 +351,13 @@ def run_weekly_mlops(reference_date=None):
     # sub-model (self_cure/roll_forward/ptp_success) di step-step berikutnya.
     try:
         df_contract = _load_df(engine, "SELECT * FROM contract_snapshot")
-        df_payment_current = _load_df(engine, "SELECT * FROM payment_history")
-        df_lkp = _load_df(engine, "SELECT * FROM lkp_interaction")
         df_customer = _load_df(engine, "SELECT * FROM customer_master")
 
-        contract_features = compute_contract_features(
-            df_contract, df_payment_current, df_lkp, ref_date
-        )
-        customer_features = compute_customer_features(
-            df_contract, df_payment_current, df_lkp, df_customer, contract_features
+        contract_features, customer_features = compute_features_chunked(
+            engine, df_contract, df_customer, ref_date,
+            batch_size=FEATURE_CHUNK_BATCH_SIZE,
+            need_customer_features=True,
+            pass_customer_to_contract_features=False,
         )
         cbs_current = build_cbs(customer_features)
         current_features = enrich_with_cbs(contract_features, cbs_current)

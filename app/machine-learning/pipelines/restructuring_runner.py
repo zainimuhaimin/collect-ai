@@ -251,6 +251,17 @@ def run_restructuring_assessment(reference_date=None, engine=None, df_scored: pd
     output_rows: list[dict] = []
     seq_counter: dict[str, int] = {}
 
+    # TASK-P2/P5: dulu tiap iterasi loop di bawah memfilter ULANG seluruh
+    # `merged` (`merged[merged["cust_id"] == row["cust_id"]] ...`) untuk
+    # mencari sibling kontrak — itu O(n) per baris x n baris = O(n²). Pada
+    # 50 rb kontrak, profiling cProfile (perf/profile_scoring.py, TASK-P2)
+    # menunjukkan ini 61% dari total waktu daily_scoring, dan pada 100 rb
+    # kontrak inilah yang membuat ladder TASK-P4 melewati stop rule waktu.
+    # `groupby` SEKALI di sini menghasilkan hasil yang PERSIS SAMA (partisi
+    # baris yang identik dengan boolean-mask lama, hanya dihitung sekali,
+    # bukan n kali) — lookup per baris jadi O(group size), total O(n).
+    siblings_by_cust = {cust_id: grp for cust_id, grp in merged.groupby("cust_id")}
+
     print(f"\n[Restructuring] Menilai {len(merged):,} kontrak untuk {ref_date}...")
 
     for _, row in merged.iterrows():
@@ -271,9 +282,12 @@ def run_restructuring_assessment(reference_date=None, engine=None, df_scored: pd
             # 1.126.647 padahal seharusnya 2.154.649), jadi guardrail menilai
             # tawaran konsolidasi terhadap pembanding yang terlalu rendah dan
             # meloloskannya terlalu mudah.
-            sibling_rows = merged[
-                (merged["cust_id"] == row["cust_id"]) & (merged["contract_no"] != row["contract_no"])
-            ]
+            cust_group = siblings_by_cust.get(row["cust_id"])
+            sibling_rows = (
+                cust_group[cust_group["contract_no"] != row["contract_no"]]
+                if cust_group is not None
+                else merged.iloc[0:0]
+            )
             sibling_rows = sibling_rows[sibling_rows["recovery_score"].notna()]
             if CONSOLIDATION_PROBLEM_CONTRACTS_ONLY:
                 sibling_rows = sibling_rows[

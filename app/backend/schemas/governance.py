@@ -155,7 +155,7 @@ class LlmSystemPromptSchema(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "prompt_version": "v1",
+                "prompt_version": "v2",
                 "system_instruction": "Anda analis kredit yang membantu petugas collection...",
             }
         }

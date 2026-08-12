@@ -1,0 +1,264 @@
+{
+    "metrics": {
+        "group_duration": {
+            "med": 7358.059417,
+            "max": 43535.14225,
+            "p(90)": 22512.1569748,
+            "p(95)": 28379.276124999997,
+            "avg": 9805.201045055022,
+            "min": 12.412583
+        },
+        "http_req_duration{endpoint:contract_list}": {
+            "max": 78959.016,
+            "p(90)": 14180.860400000001,
+            "p(95)": 52818.1395999995,
+            "avg": 8807.275280423282,
+            "min": 12.251,
+            "med": 4896.715,
+            "thresholds": {
+                "p(95)<500": true
+            }
+        },
+        "vus_max": {
+            "min": 50,
+            "max": 50,
+            "value": 50
+        },
+        "vus": {
+            "value": 2,
+            "min": 1,
+            "max": 50
+        },
+        "http_req_tls_handshaking": {
+            "med": 0,
+            "max": 0,
+            "p(90)": 0,
+            "p(95)": 0,
+            "avg": 0,
+            "min": 0
+        },
+        "http_req_blocked": {
+            "avg": 0.03381798941798952,
+            "min": 0.002,
+            "med": 0.006,
+            "max": 4.619,
+            "p(90)": 0.01,
+            "p(95)": 0.2755999999999993
+        },
+        "http_req_connecting": {
+            "max": 3.451,
+            "p(90)": 0,
+            "p(95)": 0.2065999999999999,
+            "avg": 0.01933439153439153,
+            "min": 0,
+            "med": 0
+        },
+        "http_req_duration{endpoint:customer_list}": {
+            "avg": 11416.08516931217,
+            "min": 600.689,
+            "med": 10100.385,
+            "max": 82658.571,
+            "p(90)": 17486.444,
+            "p(95)": 19066.499599999996,
+            "thresholds": {
+                "p(95)<500": true
+            }
+        },
+        "http_req_receiving": {
+            "avg": 0.19104761904761872,
+            "min": 0.032,
+            "med": 0.127,
+            "max": 9.608,
+            "p(90)": 0.34420000000000006,
+            "p(95)": 0.4453999999999999
+        },
+        "data_sent": {
+            "count": 97335,
+            "rate": 311.82786794138644
+        },
+        "data_received": {
+            "count": 2063906,
+            "rate": 6612.045077427802
+        },
+        "iterations": {
+            "rate": 0.6022873495965547,
+            "count": 188
+        },
+        "http_req_failed": {
+            "fails": 945,
+            "passes": 0,
+            "thresholds": {
+                "rate<0.01": false
+            },
+            "value": 0
+        },
+        "http_req_duration{endpoint:customer_detail}": {
+            "p(95)": 17505.247199999998,
+            "avg": 7575.8352645502655,
+            "min": 50.512,
+            "med": 5782.486,
+            "max": 79185.949,
+            "p(90)": 14974.5936,
+            "thresholds": {
+                "p(95)<500": true
+            }
+        },
+        "http_reqs": {
+            "count": 945,
+            "rate": 3.02745502855715
+        },
+        "iteration_duration": {
+            "avg": 50120.95491797869,
+            "min": 4306.759125,
+            "med": 51207.695292000004,
+            "max": 91121.780542,
+            "p(90)": 79115.67355,
+            "p(95)": 82259.118225
+        },
+        "http_req_duration{expected_response:true}": {
+            "max": 102988.038,
+            "p(90)": 26894.012200000005,
+            "p(95)": 73128.25659999966,
+            "avg": 12908.763564021148,
+            "min": 12.251,
+            "med": 7359.547
+        },
+        "http_req_duration": {
+            "med": 7359.547,
+            "max": 102988.038,
+            "p(90)": 26894.012200000005,
+            "p(95)": 73128.25659999966,
+            "avg": 12908.763564021148,
+            "min": 12.251,
+            "thresholds": {
+                "p(95)<500": true
+            }
+        },
+        "http_req_waiting": {
+            "avg": 12908.550791534395,
+            "min": 12.094,
+            "med": 7359.433,
+            "max": 102987.624,
+            "p(90)": 26893.874400000004,
+            "p(95)": 73127.74799999966
+        },
+        "http_req_duration{endpoint:dashboard_summary}": {
+            "avg": 29293.193074074086,
+            "min": 2583.14,
+            "med": 22637.841,
+            "max": 102988.038,
+            "p(90)": 84385.027,
+            "p(95)": 92492.2292,
+            "thresholds": {
+                "p(95)<500": true
+            }
+        },
+        "http_req_duration{endpoint:contract_detail}": {
+            "p(95)": 16837.724199999997,
+            "avg": 7451.429031746028,
+            "min": 12.562,
+            "med": 4764.067,
+            "max": 79200.404,
+            "p(90)": 12192.537400000001,
+            "thresholds": {
+                "p(95)<500": true
+            }
+        },
+        "checks": {
+            "passes": 945,
+            "fails": 0,
+            "value": 1
+        },
+        "http_req_sending": {
+            "max": 0.219,
+            "p(90)": 0.029,
+            "p(95)": 0.06,
+            "avg": 0.02172486772486768,
+            "min": 0.006,
+            "med": 0.018
+        }
+    },
+    "root_group": {
+        "name": "",
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {
+            "dashboard_summary": {
+                "name": "dashboard_summary",
+                "path": "::dashboard_summary",
+                "id": "57284be57d46afdb1473f83da4bda52f",
+                "groups": {},
+                "checks": {
+                        "dashboard_summary: status 200": {
+                            "path": "::dashboard_summary::dashboard_summary: status 200",
+                            "id": "e434007eb86624b34f4083447cbd504a",
+                            "passes": 189,
+                            "fails": 0,
+                            "name": "dashboard_summary: status 200"
+                        }
+                    }
+            },
+            "customer_list": {
+                "groups": {},
+                "checks": {
+                        "customer_list: status 200": {
+                            "name": "customer_list: status 200",
+                            "path": "::customer_list::customer_list: status 200",
+                            "id": "631d5ce50fa3337e54eb663ddb7a619e",
+                            "passes": 189,
+                            "fails": 0
+                        }
+                    },
+                "name": "customer_list",
+                "path": "::customer_list",
+                "id": "087e095ee29094ceeadb836d9a5302e4"
+            },
+            "customer_detail": {
+                "name": "customer_detail",
+                "path": "::customer_detail",
+                "id": "77c8a8dc32b3e54efc69a3481b136048",
+                "groups": {},
+                "checks": {
+                        "customer_detail: status 200": {
+                            "passes": 189,
+                            "fails": 0,
+                            "name": "customer_detail: status 200",
+                            "path": "::customer_detail::customer_detail: status 200",
+                            "id": "a10cc8d687c17aac52a6752ae88971e4"
+                        }
+                    }
+            },
+            "contract_list": {
+                "name": "contract_list",
+                "path": "::contract_list",
+                "id": "8d79e2da6b10a02ab2d3dccd1eca2b40",
+                "groups": {},
+                "checks": {
+                        "contract_list: status 200": {
+                            "name": "contract_list: status 200",
+                            "path": "::contract_list::contract_list: status 200",
+                            "id": "5b3e36103663c28b0b46215bb85eb879",
+                            "passes": 189,
+                            "fails": 0
+                        }
+                    }
+            },
+            "contract_detail": {
+                "id": "1bd7c29f6060440e611e199a75c88b6e",
+                "groups": {},
+                "checks": {
+                        "contract_detail: status 200": {
+                            "id": "979d9f640a220a8bb3dbcca893de7248",
+                            "passes": 189,
+                            "fails": 0,
+                            "name": "contract_detail: status 200",
+                            "path": "::contract_detail::contract_detail: status 200"
+                        }
+                    },
+                "name": "contract_detail",
+                "path": "::contract_detail"
+            }
+        },
+        "checks": {}
+    }
+}

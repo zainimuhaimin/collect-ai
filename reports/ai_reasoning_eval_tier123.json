@@ -1,0 +1,1903 @@
+[
+  {
+    "cust_id": "CUST-00001",
+    "status": "OK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": false,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 7,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [],
+          "has_hallucination": false,
+          "covers_all": true
+        },
+        "agreement": {
+          "expected": "AGREE",
+          "stored": "AGREE",
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 1,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_failed": false,
+      "judge_skipped": true,
+      "reason": "judge_disabled_or_no_key"
+    },
+    "tier3": {
+      "k_calls": 3,
+      "distinct_primary_actions": 1,
+      "actions": [
+        "Deskcoll",
+        "Deskcoll",
+        "Deskcoll"
+      ],
+      "is_consistent": true
+    }
+  },
+  {
+    "cust_id": "CUST-00002",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00002-1"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00003",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00003-1"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00004",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00004-1"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00005",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00005-1"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00006",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00006-1",
+            "CTR-00006-2"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00007",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00007-1"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00008",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00008-1"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00009",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00009-1"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00010",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00010-1",
+            "CTR-00010-2"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00011",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00011-1"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00012",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00012-1"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00013",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00013-1",
+            "CTR-00013-2"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00014",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00014-1"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00015",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00015-1"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00016",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00016-1",
+            "CTR-00016-2",
+            "CTR-00016-3"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00017",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00017-1"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00019",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00019-1",
+            "CTR-00019-2"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00020",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00020-1",
+            "CTR-00020-2",
+            "CTR-00020-3"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00021",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00021-1"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00022",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00022-1",
+            "CTR-00022-2",
+            "CTR-00022-3"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00023",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00023-1",
+            "CTR-00023-2",
+            "CTR-00023-3"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00024",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00024-1",
+            "CTR-00024-2",
+            "CTR-00024-3"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00025",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00025-1",
+            "CTR-00025-2",
+            "CTR-00025-3"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00026",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00026-1"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00027",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00027-1"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00028",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00028-1"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00029",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00029-1"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00030",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00030-1"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00031",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00031-1"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00032",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00032-1"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00033",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00033-1",
+            "CTR-00033-2",
+            "CTR-00033-3"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00034",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00034-1"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00035",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00035-1"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00036",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00036-1",
+            "CTR-00036-2",
+            "CTR-00036-3"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00037",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00037-1"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00038",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00038-1",
+            "CTR-00038-2"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00039",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00039-1"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  },
+  {
+    "cust_id": "CUST-00040",
+    "status": "FALLBACK",
+    "tier1": {
+      "unsupported_claim_count": 0,
+      "unsupported_claim_rate": 0.0,
+      "contract_hallucination": false,
+      "contract_coverage_gap": true,
+      "agreement_consistent": true,
+      "urgency_monotonic": true,
+      "valid_enum": true,
+      "detail": {
+        "grounding": {
+          "total_numbers_cited": 0,
+          "unsupported_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_examples": []
+        },
+        "integrity": {
+          "hallucinated_contract_nos": [],
+          "missing_contract_nos": [
+            "CTR-00040-1",
+            "CTR-00040-2"
+          ],
+          "has_hallucination": false,
+          "covers_all": false
+        },
+        "agreement": {
+          "expected": null,
+          "stored": null,
+          "consistent": true
+        },
+        "urgency": {
+          "n_pairs": 0,
+          "inversions": 0
+        },
+        "enum": {
+          "primary_nba_action_valid": true,
+          "urgency_values_valid": true
+        }
+      }
+    },
+    "tier2": {
+      "judge_skipped": true,
+      "judge_failed": false,
+      "reason": "record_not_OK"
+    },
+    "tier3": null
+  }
+]

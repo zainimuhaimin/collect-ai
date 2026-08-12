@@ -293,10 +293,17 @@ class GovernanceAuditEntry:
 class SyncStep:
     """1 langkah job Sync AI Intelligence — 4 model_type (recovery/self_cure/
     roll_forward/ptp_success) + 1 langkah `daily_scoring` gabungan di akhir
-    (lihat AiIntelligenceSyncService)."""
+    (lihat AiIntelligenceSyncService).
+
+    started_at/duration_s (TASK-P1): durasi step ditampilkan di UI Sync
+    ("training 42 detik") — nilai demo tinggi, biaya kecil. Diisi
+    _set_step_status() saat status berubah ke 'running' (started_at) dan ke
+    'done'/'failed' (duration_s = now - started_at)."""
     model_type: str
     action: str    # 'train_then_score' | 'score_only' (4 model_type) | 'score' (daily_scoring)
     status: str = "pending"   # 'pending' | 'running' | 'done' | 'failed'
+    started_at: Optional[datetime] = None
+    duration_s: Optional[float] = None
 
 
 @dataclass

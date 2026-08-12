@@ -97,6 +97,8 @@ let syncState: SyncStatusResponse = {
     modelType,
     action: modelType === 'daily_scoring' ? 'score' : 'train_then_score',
     status: 'pending',
+    startedAt: null,
+    durationS: null,
   })),
   lastScoredAt,
   error: null,
@@ -118,6 +120,8 @@ export function startSyncFixture(): { ok: true; jobId: string } | { ok: false; s
       modelType,
       action: modelType === 'daily_scoring' ? 'score' : 'train_then_score',
       status: index === 0 ? 'running' : 'pending',
+      startedAt: index === 0 ? new Date().toISOString() : null,
+      durationS: null,
     })),
     lastScoredAt,
     error: null,
@@ -126,16 +130,20 @@ export function startSyncFixture(): { ok: true; jobId: string } | { ok: false; s
 }
 
 // Advances the mock sync state machine by one step per call — simulates progress
-// across successive status polls.
+// across successive status polls. durationS is a plausible fake (TASK-P1 has
+// nothing "real" to time in the mock) — good enough to demo the UI element.
 export function advanceSyncFixture(): SyncStatusResponse {
   if (syncState.status !== 'running') return syncState;
 
   const runningIndex = syncState.steps.findIndex((step) => step.status === 'running');
   const nextSteps = syncState.steps.map((step) => ({ ...step }));
   if (runningIndex >= 0) {
+    const fakeDurationS = nextSteps[runningIndex].modelType === 'daily_scoring' ? 12.4 : 38.7;
     nextSteps[runningIndex].status = 'done';
+    nextSteps[runningIndex].durationS = fakeDurationS;
     if (runningIndex + 1 < nextSteps.length) {
       nextSteps[runningIndex + 1].status = 'running';
+      nextSteps[runningIndex + 1].startedAt = new Date().toISOString();
       syncState = { ...syncState, steps: nextSteps };
     } else {
       lastScoredAt = new Date().toISOString();

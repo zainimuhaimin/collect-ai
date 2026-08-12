@@ -214,6 +214,19 @@ CREATE INDEX IF NOT EXISTS idx_payment_self_cure
 CREATE INDEX IF NOT EXISTS idx_payment_recovery_source
   ON payment_history (recovery_source);
 
+-- ── INDEXES upgrade (TASK-P5c, post-presentation-review-tasks.md) ──
+-- Ditemukan lewat EXPLAIN ANALYZE nyata di TASK-P2 (perf/explain_queries.sql),
+-- bukan spekulatif. `idx_lkp_ptp_status`/`idx_payment_self_cure` di atas
+-- SUDAH memimpin dengan contract_no, tapi keduanya diurutkan sekunder oleh
+-- kolom yang SALAH untuk pola query `DISTINCT ON (contract_no) ORDER BY
+-- contract_no, action_date/due_date DESC` — Postgres masih harus Sort
+-- terpisah (`Incremental Sort` di EXPLAIN, TASK-P2) karena urutan
+-- sekunder index tidak cocok dengan ORDER BY yang diminta.
+CREATE INDEX IF NOT EXISTS idx_lkp_contract_action_date
+  ON lkp_interaction (contract_no, action_date DESC);
+CREATE INDEX IF NOT EXISTS idx_payment_contract_due_date
+  ON payment_history (contract_no, due_date DESC);
+
 -- ══════════════════════════════════════════════════════════════════
 -- RESTRUCTURING RECOMMENDATION ENGINE (eks schema_v3)
 -- ══════════════════════════════════════════════════════════════════
@@ -395,3 +408,100 @@ CREATE TABLE IF NOT EXISTS ai_reasoning_output (
 );
 CREATE INDEX IF NOT EXISTS idx_ai_reasoning_cust
     ON ai_reasoning_output (cust_id, created_at DESC);
+
+-- ══════════════════════════════════════════════════════════════════
+-- DAY-TO-DAY SYNC (TASK-S2, post-presentation-review-tasks.md)
+-- ══════════════════════════════════════════════════════════════════
+
+-- ── STAGING: hasil SATU run faker (--no-db --dump-latents --dump-schedule,
+-- as_of = horizon terjauh yang mau disimulasikan), diisi via
+-- scripts/simulate_days.py sebelum loop replay-bertahap dimulai. Skema
+-- kolom SAMA seperti tabel live berkat `LIKE` (tanpa CHECK/PK ikut disalin
+-- — staging boleh menampung baris bertanggal masa depan relatif tabel
+-- live). Bukan tabel live: tidak pernah dibaca aplikasi, hanya dibaca
+-- simulate_days.py untuk menyuap tabel live bertahap.
+CREATE TABLE IF NOT EXISTS stg_customer_master (LIKE customer_master);
+CREATE TABLE IF NOT EXISTS stg_contract_snapshot (LIKE contract_snapshot);
+CREATE TABLE IF NOT EXISTS stg_payment_history (LIKE payment_history);
+CREATE TABLE IF NOT EXISTS stg_lkp_interaction (LIKE lkp_interaction);
+
+-- ── Jadwal cicilan penuh (termasuk yang BELUM dibayar) — faker TIDAK
+-- pernah menyimpan ini ke tabel manapun secara default (hanya payment yang
+-- benar-benar terjadi jadi baris payment_history). Tanpa ini, tidak ada
+-- cara menghitung "berapa angsuran yang overdue" begitu payment_history
+-- disuap bertahap alih-alih dimuat penuh sekaligus.
+CREATE TABLE IF NOT EXISTS stg_installment_schedule (
+    contract_no          VARCHAR(30),
+    installment_no       INT,
+    due_date             DATE,
+    installment_amount   NUMERIC(15, 2)
+);
+CREATE INDEX IF NOT EXISTS idx_stg_installment_schedule_contract
+    ON stg_installment_schedule (contract_no, due_date);
+
+-- ── ARSIP histori skor per hari simulasi. Append-only, TIDAK ikut siklus
+-- reset faker (`DERIVED_ML_TABLES`, faker/helpers/database.py) — tabel
+-- live (`ai_intelligence_output`) hanya menyimpan state HARI TERAKHIR,
+-- jadi tanpa arsip ini histori hari-hari sebelumnya hilang begitu hari
+-- baru disimulasikan. Dibaca TASK-S4 (`scripts/movement_report.py`).
+CREATE TABLE IF NOT EXISTS scoring_history (
+    id                        BIGSERIAL PRIMARY KEY,
+    snapshot_date             DATE           NOT NULL,
+    contract_no               VARCHAR(30)    NOT NULL,
+    cust_id                   VARCHAR(30),
+    risk_segment              VARCHAR(20),
+    recovery_score            NUMERIC(5,4),
+    self_cure_probability     NUMERIC(5,4),
+    roll_forward_risk         NUMERIC(5,4),
+    ptp_success_probability   NUMERIC(5,4),
+    nba_recommendation        VARCHAR(20),
+    nba_trigger               VARCHAR(60),
+    priority_level            VARCHAR(10),
+    dpd_current               INT,
+    total_ots                 NUMERIC(18,2),
+    created_at                TIMESTAMP      DEFAULT NOW(),
+    UNIQUE (contract_no, snapshot_date)
+);
+CREATE INDEX IF NOT EXISTS idx_scoring_history_snapshot_date ON scoring_history (snapshot_date);
+CREATE INDEX IF NOT EXISTS idx_scoring_history_contract ON scoring_history (contract_no);
+
+-- ══════════════════════════════════════════════════════════════════
+-- EVALUASI AI REASONING (TASK-E5, post-presentation-review-tasks.md)
+-- ══════════════════════════════════════════════════════════════════
+
+-- Tabel TERPISAH dari ai_reasoning_output (bukan kolom tambahan) supaya
+-- satu output yang sama bisa DIEVALUASI ULANG oleh beberapa versi
+-- evaluator (`evaluator_version`) tanpa saling menimpa — ai_reasoning_output
+-- sendiri UNIQUE per (cust_id, source_signature, prompt_version) sehingga
+-- tidak bisa menampung banyak baris evaluasi per output.
+CREATE TABLE IF NOT EXISTS ai_reasoning_evaluation (
+    id                       BIGSERIAL PRIMARY KEY,
+    ai_reasoning_output_id   INTEGER NOT NULL REFERENCES ai_reasoning_output(id) ON DELETE CASCADE,
+    evaluator_version        VARCHAR(20) NOT NULL,
+    -- Tier 1 — deterministic checks (tanpa LLM)
+    tier1_unsupported_claim_count   INT,
+    tier1_unsupported_claim_rate    NUMERIC(6,4),
+    tier1_contract_hallucination    BOOLEAN,
+    tier1_contract_coverage_gap     BOOLEAN,
+    tier1_agreement_consistent      BOOLEAN,
+    tier1_urgency_monotonic         BOOLEAN,
+    tier1_valid_enum                BOOLEAN,
+    tier1_detail                    JSONB,
+    -- Tier 2 — LLM-as-judge (provider OpenAI-compatible, keluarga model beda)
+    tier2_judge_model               VARCHAR(60),
+    tier2_faithfulness_score        NUMERIC(4,2),
+    tier2_actionability_score       NUMERIC(4,2),
+    tier2_internal_consistency_score NUMERIC(4,2),
+    tier2_key_factors_alignment_score NUMERIC(4,2),
+    tier2_judge_failed               BOOLEAN DEFAULT FALSE,
+    tier2_judge_error                TEXT,
+    tier2_raw_response               JSONB,
+    -- Tier 3 — self-consistency (K panggilan ulang payload sama)
+    tier3_k_calls                    INT,
+    tier3_distinct_primary_actions   INT,
+    tier3_actions                    JSONB,
+    evaluated_at                     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (ai_reasoning_output_id, evaluator_version)
+);
+CREATE INDEX IF NOT EXISTS idx_ai_reasoning_eval_output
+    ON ai_reasoning_evaluation (ai_reasoning_output_id);

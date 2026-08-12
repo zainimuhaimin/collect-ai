@@ -169,11 +169,20 @@ def compute_contract_features(
         p["pay_status"] = p["pay_status"].astype(str)
 
         payment_id_col = "payment_id" if "payment_id" in p.columns else "contract_no"
+        # TASK-P5b: dulu full_count/partial_count pakai lambda custom di
+        # .agg() — pandas TIDAK BISA memvektorisasi callable custom (jatuh ke
+        # `_python_agg_general`, iterasi Python per grup — 9 kolom seperti
+        # ini terkonfirmasi 76,7s di profil 50rb customer, TASK-P2). Boolean
+        # dihitung SEKALI di luar groupby (vektor C), lalu `.agg(..., "sum")`
+        # jadi reduksi C-level biasa — hasilnya identik (sum of bool ==
+        # count of True), bukan sekadar mirip.
+        p["_pay_full"] = p["pay_status"] == "Full"
+        p["_pay_partial"] = p["pay_status"] == "Partial"
         pay_agg = (
             p.groupby("contract_no").agg(
                 payment_count=(payment_id_col, "count"),
-                full_count=("pay_status", lambda s: (s == "Full").sum()),
-                partial_count=("pay_status", lambda s: (s == "Partial").sum()),
+                full_count=("_pay_full", "sum"),
+                partial_count=("_pay_partial", "sum"),
                 avg_delay_days=("delay_days", "mean"),
                 last_pay_date=("actual_pay_date", "max"),
             ).reset_index()
@@ -241,23 +250,47 @@ def compute_contract_features(
         if "ptp_status" not in l.columns:
             l["ptp_status"] = "UNKNOWN"
 
+        # TASK-P5b: sama seperti pay_agg di atas — 6 lambda custom di sini
+        # dulu ikut menyumbang ke `_python_agg_general` (76,7s gabungan
+        # dengan payment, TASK-P2). Boolean/numeric dihitung SEKALI di luar
+        # groupby, `.agg(..., "sum")` jadi C-level. Hasil identik: sum of
+        # bool == count matching, coerce+fillna+sum di luar == di dalam agg
+        # (operasi elemen-per-elemen, tidak bergantung urutan grouping).
+        l["_rejection"] = l["result_code"].isin(["Menolak", "Tidak Bisa Dihubungi", "Tidak Bisa"])
+        l["_ptp_made"] = l["result_code"] == "PTP"
+        l["_open_ptp"] = l["ptp_status"] == "OPEN"
+        l["rpc_flag"] = pd.to_numeric(l["rpc_flag"], errors="coerce").fillna(0)
+        l["contact_success_flag"] = pd.to_numeric(l["contact_success_flag"], errors="coerce").fillna(0)
+        l["ptp_amount"] = pd.to_numeric(l["ptp_amount"], errors="coerce").fillna(0.0)
+
         lkp_agg = (
             l.groupby("contract_no").agg(
                 treatment_count=(lkp_id_col, "count"),
                 avg_interaction_score=("interaction_score", "mean"),
-                rejection_count=("result_code", lambda s: s.isin(
-                    ["Menolak", "Tidak Bisa Dihubungi", "Tidak Bisa"]
-                ).sum()),
-                total_ptp_made=("result_code", lambda s: (s == "PTP").sum()),
-                rpc_count=("rpc_flag", lambda s: pd.to_numeric(s, errors="coerce").fillna(0).sum()),
-                contact_success_count=("contact_success_flag", lambda s: pd.to_numeric(s, errors="coerce").fillna(0).sum()),
-                ptp_amount_total=("ptp_amount", lambda s: pd.to_numeric(s, errors="coerce").fillna(0.0).sum()),
-                open_ptp_count=("ptp_status", lambda s: (s == "OPEN").sum()),
+                rejection_count=("_rejection", "sum"),
+                total_ptp_made=("_ptp_made", "sum"),
+                rpc_count=("rpc_flag", "sum"),
+                contact_success_count=("contact_success_flag", "sum"),
+                ptp_amount_total=("ptp_amount", "sum"),
+                open_ptp_count=("_open_ptp", "sum"),
             ).reset_index()
         )
 
-        # last_result_code: result code dari action_date terbaru per kontrak
-        l_sorted = l.dropna(subset=["action_date"]).sort_values("action_date")
+        # last_result_code: result code dari action_date terbaru per kontrak.
+        # Tie-break EKSPLISIT lewat lkp_id (PK sekuensial, urutan generate
+        # asli) saat >1 interaksi jatuh di action_date yang SAMA — ditambah
+        # sesi lanjutan TASK-P5 (chunked read): `sort_values("action_date")`
+        # tanpa kunci sekunder memakai quicksort (default, TIDAK stabil),
+        # jadi tie-break-nya bergantung pada urutan SELURUH baris di
+        # dataframe yang disortir, bukan cuma urutan relatif baris yang
+        # tie — ditemukan lewat parity gate (compute_contract_features
+        # dipanggil pada batch vs dataset penuh menghasilkan last_result_code
+        # BEDA untuk kontrak dengan interaksi tie, walau baris yang sama
+        # persis, karena ukuran/isi array yang disortir berbeda). Ini
+        # memperbaiki determinisme fungsi ASLI (bukan cuma "cocok dengan
+        # versi chunked") — hasil untuk kontrak TANPA tie tidak berubah.
+        sort_keys = ["action_date", "lkp_id"] if "lkp_id" in l.columns else ["action_date"]
+        l_sorted = l.dropna(subset=["action_date"]).sort_values(sort_keys)
         last_res = (
             l_sorted.groupby("contract_no")["result_code"].last().reset_index()
             .rename(columns={"result_code": "last_result_code"})
@@ -346,29 +379,73 @@ def compute_contract_features(
 # Customer-level features (System Rules 2.2)
 # ────────────────────────────────────────────────────────────────────
 
-def _compute_delay_trend(payment_df: pd.DataFrame, window_months: int) -> float:
-    """Slope linear dari avg(delay_days) per bulan dalam window terakhir.
+def _compute_delay_trend_batch(p2: pd.DataFrame, window_months: int, reference_date=None) -> pd.DataFrame:
+    """Slope linear dari avg(delay_days) per bulan dalam window terakhir, untuk
+    SEMUA customer di `p2` sekaligus (TASK-P5b — vektorisasi).
 
-    Return 0.0 jika data tidak cukup (< 2 bulan).
+    Implementasi lama (`_compute_delay_trend`, dihapus) dipanggil dari loop
+    Python satu customer per iterasi (`for cust_id, grp in p2.groupby(...)`)
+    — pada profil 50 rb customer (perf/profile_scoring.py, TASK-P2) ini
+    48.550 panggilan makan 126,8s cumulative, hotspot #2 terbesar di seluruh
+    pipeline. Slope OLS derajat-1 punya bentuk tertutup:
+    slope = (nΣxy - ΣxΣy) / (nΣx² - (Σx)²) — identik secara matematis dengan
+    `np.polyfit(x, y, 1)[0]` yang dipakai versi lama (beda hasil hanya di
+    lantai presisi float: np.polyfit lewat SVD, ini lewat rumus langsung).
+    Dihitung SEKALI untuk semua customer via groupby vektor (C-level
+    sum/mean/cumcount), bukan dipanggil ulang per customer.
+
+    Return: DataFrame (cust_id, delay_trend) HANYA untuk cust_id yang punya
+    >=2 bulan data valid dalam window — caller WAJIB `fillna(0.0)` untuk
+    yang tidak ada baris (sama seperti perilaku `_compute_delay_trend` lama
+    yang me-return 0.0 untuk kasus itu).
+
+    ``reference_date`` (opsional, ditambahkan sesi lanjutan TASK-S3): jendela
+    dihitung mundur dari sini, BUKAN dari jam dinding nyata — tanpa ini,
+    simulasi hari-per-hari (TASK-S2) membocorkan tanggal nyata ke fitur
+    delay_trend meski `daily_scoring.py --date` disetel ke tanggal simulasi.
+    Default `datetime.now()` (perilaku lama) kalau tidak diberikan.
     """
-    if payment_df.empty or "actual_pay_date" not in payment_df.columns:
-        return 0.0
-    df = payment_df.dropna(subset=["actual_pay_date", "delay_days"]).copy()
+    if p2.empty or "actual_pay_date" not in p2.columns:
+        return pd.DataFrame(columns=["cust_id", "delay_trend"])
+
+    df = p2.dropna(subset=["actual_pay_date", "delay_days", "cust_id"]).copy()
     if df.empty:
-        return 0.0
+        return pd.DataFrame(columns=["cust_id", "delay_trend"])
+
     df["actual_pay_date"] = _to_dt(df["actual_pay_date"])
-    cutoff = pd.Timestamp.today() - pd.DateOffset(months=window_months)
+    as_of = pd.Timestamp(reference_date) if reference_date is not None else pd.Timestamp.today()
+    cutoff = as_of - pd.DateOffset(months=window_months)
     df = df[df["actual_pay_date"] >= cutoff]
     if df.empty:
-        return 0.0
+        return pd.DataFrame(columns=["cust_id", "delay_trend"])
+
     df["ym"] = df["actual_pay_date"].dt.to_period("M")
-    monthly = df.groupby("ym")["delay_days"].mean().reset_index()
-    if len(monthly) < 2:
-        return 0.0
-    x = np.arange(len(monthly), dtype=float)
-    y = monthly["delay_days"].astype(float).values
-    slope = np.polyfit(x, y, 1)[0]
-    return float(slope)
+    monthly = (
+        df.groupby(["cust_id", "ym"])["delay_days"].mean()
+        .reset_index()
+        .sort_values(["cust_id", "ym"])
+    )
+    # x = rank bulan (0,1,2,...) DI DALAM tiap customer, pada urutan ym
+    # terurut — persis sama dengan np.arange(len(monthly)) per customer di
+    # versi lama, dihitung sekali untuk semua customer via cumcount vektor.
+    monthly["x"] = monthly.groupby("cust_id").cumcount().astype(float)
+    y = monthly["delay_days"].astype(float)
+    monthly["y"] = y
+    monthly["xy"] = monthly["x"] * y
+    monthly["x2"] = monthly["x"] * monthly["x"]
+
+    stats = monthly.groupby("cust_id").agg(
+        n=("y", "size"),
+        sum_x=("x", "sum"),
+        sum_y=("y", "sum"),
+        sum_xy=("xy", "sum"),
+        sum_x2=("x2", "sum"),
+    ).reset_index()
+
+    denom = stats["n"] * stats["sum_x2"] - stats["sum_x"] ** 2
+    slope = (stats["n"] * stats["sum_xy"] - stats["sum_x"] * stats["sum_y"]) / denom.replace(0, np.nan)
+    stats["delay_trend"] = np.where(stats["n"] >= 2, slope.fillna(0.0), 0.0)
+    return stats[["cust_id", "delay_trend"]]
 
 
 def compute_customer_features(
@@ -378,6 +455,7 @@ def compute_customer_features(
     df_customer: pd.DataFrame,
     df_contract_features: pd.DataFrame | None = None,
     feature_cutoff_date=None,
+    reference_date=None,
 ) -> pd.DataFrame:
     """Agregat per CUST_ID lintas semua kontrak.
 
@@ -385,6 +463,11 @@ def compute_customer_features(
     ``feature_cutoff_date``: sama seperti di compute_contract_features —
     filter payment/lkp ke tanggal <= cutoff sebelum menghitung delay_trend
     dan channel_effectiveness, untuk konsistensi anti-leakage saat training.
+    ``reference_date`` (opsional, TASK-S3 sesi lanjutan): diteruskan ke
+    `_compute_delay_trend_batch()` sebagai titik "hari ini" untuk jendela
+    `DELAY_TREND_WINDOW_MONTHS` — default `datetime.now()` (perilaku lama)
+    kalau tidak diberikan, supaya call-site yang tidak mensimulasikan
+    tanggal (train_*.py, weekly_mlops.py) tidak berubah perilakunya.
     """
     c = _lower_cols(df_contract)
     p = _lower_cols(df_payment) if df_payment is not None else pd.DataFrame()
@@ -466,13 +549,7 @@ def compute_customer_features(
     if not p.empty:
         p2 = p.merge(cf[["contract_no", "cust_id"]], on="contract_no", how="left")
         p2 = p2[["cust_id", "actual_pay_date", "delay_days"]].copy()
-        trend_rows = []
-        for cust_id, grp in p2.groupby("cust_id"):
-            trend_rows.append({
-                "cust_id": cust_id,
-                "delay_trend": _compute_delay_trend(grp, DELAY_TREND_WINDOW_MONTHS),
-            })
-        trends = pd.DataFrame(trend_rows)
+        trends = _compute_delay_trend_batch(p2, DELAY_TREND_WINDOW_MONTHS, reference_date)
         agg = agg.merge(trends, on="cust_id", how="left")
     else:
         agg["delay_trend"] = 0.0

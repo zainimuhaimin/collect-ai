@@ -95,7 +95,16 @@ def _customer_profile_block(behavioral: Optional[CustomerBehavioralRaw]) -> dict
     return block
 
 
-def _portfolio_rollup_block(active_contracts: List[ContractDetail]) -> dict:
+def compute_nba_spread(active_contracts: List[ContractDetail]) -> List[str]:
+    """nba_recommendation (rule engine) unik lintas kontrak aktif yang sudah
+    discoring — dipakai di payload (`portfolio_rollup.nba_spread`) DAN oleh
+    ai_reasoning_service.py untuk menghitung nba_agreement (AGREE/DIFFER)
+    secara deterministik, bukan self-report LLM."""
+    scored = [c for c in active_contracts if c.ai_scoring is not None]
+    return sorted({c.ai_scoring.nba_recommendation for c in scored if c.ai_scoring.nba_recommendation})
+
+
+def _portfolio_rollup_block(active_contracts: List[ContractDetail], include_rule_nba: bool = True) -> dict:
     scored = [c for c in active_contracts if c.ai_scoring is not None]
 
     worst_dpd = max((c.dpd_current for c in active_contracts), default=0)
@@ -119,14 +128,18 @@ def _portfolio_rollup_block(active_contracts: List[ContractDetail]) -> dict:
         c.principal_ots + c.interest_ots for c in active_contracts if c.dpd_current > 0
     )
 
-    nba_spread = sorted({c.ai_scoring.nba_recommendation for c in scored if c.ai_scoring.nba_recommendation})
-
     rollup = {
         "worst_dpd": worst_dpd,
         "contracts_in_arrears": sum(1 for c in active_contracts if c.dpd_current > 0),
         "arrears_ots_share": round(arrears_ots / total_ots, 4) if total_ots > 0 else 0.0,
-        "nba_spread": nba_spread,
     }
+    # nba_spread SENGAJA bisa dihilangkan (TASK-E6, ablation anchoring) —
+    # nba_agreement (dihitung ai_reasoning_service.py) tetap jalan lewat
+    # compute_nba_spread() yang dipanggil TERPISAH di sana, TIDAK lewat
+    # payload ini, jadi menghilangkan field ini dari payload tidak
+    # mempengaruhi perhitungan agreement (E2).
+    if include_rule_nba:
+        rollup["nba_spread"] = compute_nba_spread(active_contracts)
     if worst_risk_segment is not None:
         rollup["worst_risk_segment"] = worst_risk_segment
     if worst_cycle is not None:
@@ -148,7 +161,7 @@ def _portfolio_rollup_block(active_contracts: List[ContractDetail]) -> dict:
     return rollup
 
 
-def _contract_block(c: ContractDetail) -> dict:
+def _contract_block(c: ContractDetail, include_rule_nba: bool = True) -> dict:
     block = {
         "contract_no": c.contract_no,
         "product_type": c.product_type,
@@ -171,10 +184,20 @@ def _contract_block(c: ContractDetail) -> dict:
     if c.ai_scoring is not None:
         block["risk_segment"] = c.ai_scoring.risk_segment
         block["recovery_score"] = c.ai_scoring.recovery_score
-        if c.ai_scoring.nba_recommendation:
-            block["nba_recommendation"] = c.ai_scoring.nba_recommendation
-        if c.ai_scoring.nba_trigger:
-            block["nba_trigger"] = c.ai_scoring.nba_trigger
+        block["self_cure_probability"] = c.ai_scoring.self_cure_probability
+        block["ptp_success_probability"] = c.ai_scoring.ptp_success_probability
+        # roll_forward_risk tersimpan TERBALIK (P(tidak bayar), bukan P(bayar) —
+        # sama seperti max_roll_forward_risk_prob_not_paying di rollup) — nama
+        # field WAJIB self-describing supaya LLM tidak salah tafsir arahnya.
+        block["roll_forward_risk_prob_not_paying"] = c.ai_scoring.roll_forward_risk
+        # nba_recommendation/nba_trigger SENGAJA bisa dihilangkan (TASK-E6,
+        # ablation anchoring) — mengukur apakah LLM "menjangkar" pada
+        # rekomendasi rule engine alih-alih bernalar dari angka mentah.
+        if include_rule_nba:
+            if c.ai_scoring.nba_recommendation:
+                block["nba_recommendation"] = c.ai_scoring.nba_recommendation
+            if c.ai_scoring.nba_trigger:
+                block["nba_trigger"] = c.ai_scoring.nba_trigger
     # historical_default_count/income_debt_ratio SENGAJA tidak dikirim meski
     # sekarang terisi benar (Fase 0 perbaikan temuan #17) — itu fitur model,
     # bukan fakta yang perlu dijelaskan ke LLM (concern berbeda, lihat §1.1).
@@ -186,12 +209,19 @@ def build_payload(
     behavioral: Optional[CustomerBehavioralRaw],
     active_contracts: List[ContractDetail],
     as_of: Optional[date] = None,
+    include_rule_nba: bool = True,
 ) -> dict:
+    """``include_rule_nba=False`` (TASK-E6, ablation anchoring) menghilangkan
+    ``nba_recommendation``/``nba_trigger`` per kontrak dan ``nba_spread`` di
+    rollup dari payload — LLM tidak lagi melihat rekomendasi rule engine sama
+    sekali, hanya angka mentah. Dipakai `scripts/ablation_nba.py` untuk
+    mengukur seberapa sering LLM "menjangkar" (anchoring) pada rekomendasi
+    itu ketika tersedia, dibanding saat harus bernalar sendiri dari data."""
     return {
         "cust_id": cust_id,
         "as_of": (as_of or date.today()).isoformat(),
         "available_models": available_models(),
         "customer_profile": _customer_profile_block(behavioral),
-        "portfolio_rollup": _portfolio_rollup_block(active_contracts),
-        "contracts": [_contract_block(c) for c in active_contracts],
+        "portfolio_rollup": _portfolio_rollup_block(active_contracts, include_rule_nba=include_rule_nba),
+        "contracts": [_contract_block(c, include_rule_nba=include_rule_nba) for c in active_contracts],
     }

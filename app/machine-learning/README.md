@@ -145,6 +145,10 @@ app/machine-learning/
 │   └── schema*.sql              # DDL (lihat tabel di atas)
 ├── src/
 │   ├── feature_engineering.py   # ekstraksi fitur + guard anti-leakage
+│   ├── chunked_features.py      # baca+agregasi per-batch cust_id (RAM konstan
+│   │                             # terhadap N) — dipakai daily_scoring/train_*/
+│   │                             # weekly_mlops/cbs_builder, TIDAK mengubah
+│   │                             # nilai fitur (lihat performance-report.md §3f)
 │   ├── cbs_builder.py           # Customer Behavioral Standing
 │   ├── business_rules.py        # risk segment, NBA + nba_trigger (cabang mana yang
 │   │                             # menang), priority, CHANNEL_RANK
@@ -315,7 +319,7 @@ Tiga strategi tersedia di `src/retrain_strategies.py`:
 ## Testing
 
 ```bash
-pytest tests/ -q      # 155 test, TIDAK butuh database
+pytest tests/ -q      # 168 test, TIDAK butuh database
 ```
 
 | Modul | Cakupan |
@@ -326,6 +330,7 @@ pytest tests/ -q      # 155 test, TIDAK butuh database
 | `test_scoring.py` | Scoring engine + quality check |
 | `test_mlops.py` | Drift, registry, champion/challenger |
 | `test_restructuring_engine.py` | Eligibility, kalkulasi tawaran, guardrail |
+| `test_features_chunked.py` | Parity chunked read vs non-chunked (byte-identik, semua kombinasi param) |
 
 ---
 

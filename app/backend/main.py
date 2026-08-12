@@ -1,8 +1,19 @@
-from fastapi import FastAPI
+import logging
+import time
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.v1.api import api_router
 from core.config import settings
+
+logging.basicConfig(level=logging.INFO)
+_logger = logging.getLogger("collectai.request_timing")
+
+# TASK-P1: nol timing/logging sebelum ini di seluruh app/backend. Ambang
+# "request lambat" — bisa dinaikkan lewat env kalau perlu, tapi default ini
+# cukup untuk menangkap endpoint yang mulai melambat di rung data besar.
+SLOW_REQUEST_THRESHOLD_S = 1.0
 
 TAGS_METADATA = [
     {
@@ -99,6 +110,24 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def add_process_time_header(request: Request, call_next):
+    """TASK-P1: instrumentasi timing request — sebelum ini backend tidak
+    punya logging/timing sama sekali. Header ``X-Process-Time`` untuk
+    inspeksi per-request (mis. lewat DevTools/k6 di TASK-P7); request yang
+    melewati SLOW_REQUEST_THRESHOLD_S dicatat ke log supaya endpoint yang
+    melambat di rung data besar (Area 1) tidak diam-diam lolos tanpa jejak."""
+    start = time.perf_counter()
+    response = await call_next(request)
+    duration_s = time.perf_counter() - start
+    response.headers["X-Process-Time"] = f"{duration_s:.4f}"
+    if duration_s >= SLOW_REQUEST_THRESHOLD_S:
+        _logger.warning(
+            "Slow request: %s %s took %.3fs", request.method, request.url.path, duration_s
+        )
+    return response
+
 
 app.include_router(api_router, prefix=settings.api_v1_prefix)
 

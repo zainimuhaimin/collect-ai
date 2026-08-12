@@ -128,7 +128,11 @@ class AiIntelligenceSyncService:
         # mis. scoring dijalankan manual lewat cron/CLI di luar backend).
         last_scored_at = self._repo.get_last_scored_at()
         with _lock:
-            steps = [asdict(s) for s in _state.steps]
+            steps = []
+            for s in _state.steps:
+                step = asdict(s)
+                step["started_at"] = s.started_at.isoformat() if s.started_at else None
+                steps.append(step)
             status, started_at, finished_at, error = (
                 _state.status,
                 _state.started_at,
@@ -253,6 +257,10 @@ class AiIntelligenceSyncService:
         with _lock:
             for s in _state.steps:
                 if s.model_type == model_type:
+                    if status == "running":
+                        s.started_at = datetime.now()
+                    elif status in ("done", "failed") and s.started_at is not None:
+                        s.duration_s = (datetime.now() - s.started_at).total_seconds()
                     s.status = status
                     break
 

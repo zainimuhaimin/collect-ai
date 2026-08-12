@@ -6,7 +6,10 @@ from pydantic import BaseModel, ConfigDict, Field
 class SyncStepSchema(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
-            "example": {"model_type": "recovery", "action": "train_then_score", "status": "done"},
+            "example": {
+                "model_type": "recovery", "action": "train_then_score", "status": "done",
+                "started_at": "2026-08-12T10:00:00", "duration_s": 42.31,
+            },
         }
     )
 
@@ -16,6 +19,10 @@ class SyncStepSchema(BaseModel):
         "'score' untuk langkah daily_scoring gabungan di akhir"
     )
     status: str = Field(description="'pending' | 'running' | 'done' | 'failed'")
+    started_at: Optional[str] = Field(default=None, description="Diisi saat status berubah ke 'running' (TASK-P1)")
+    duration_s: Optional[float] = Field(
+        default=None, description="Diisi saat status berubah ke 'done'/'failed' — durasi step ini (TASK-P1)"
+    )
 
 
 class SyncStartResponse(BaseModel):

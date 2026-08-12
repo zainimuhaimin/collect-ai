@@ -1,0 +1,211 @@
+                                                                                           QUERY PLAN                                                                                           
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=10130.79..10133.11 rows=20 width=154) (actual time=221.011..221.068 rows=20 loops=1)
+   Buffers: shared hit=3150, temp read=623 written=681
+   ->  Merge Left Join  (cost=10130.79..15929.19 rows=50000 width=154) (actual time=221.010..221.065 rows=20 loops=1)
+         Merge Cond: ((cm.cust_id)::text = (cs_1.cust_id)::text)
+         Buffers: shared hit=3150, temp read=623 written=681
+         ->  Merge Left Join  (cost=5110.74..8836.90 rows=50000 width=48) (actual time=121.764..121.796 rows=20 loops=1)
+               Merge Cond: ((cm.cust_id)::text = (cs.cust_id)::text)
+               Buffers: shared hit=1579, temp read=348 written=379
+               ->  Merge Left Join  (cost=0.56..2745.58 rows=50000 width=44) (actual time=0.015..0.029 rows=20 loops=1)
+                     Merge Cond: ((cm.cust_id)::text = (cbs.cust_id)::text)
+                     Buffers: shared hit=5
+                     ->  Index Scan using customer_master_pkey on customer_master cm  (cost=0.41..2581.43 rows=50000 width=36) (actual time=0.012..0.021 rows=20 loops=1)
+                           Buffers: shared hit=4
+                     ->  Index Scan using customer_behavioral_standing_pkey on customer_behavioral_standing cbs  (cost=0.15..29.15 rows=800 width=26) (actual time=0.002..0.002 rows=0 loops=1)
+                           Buffers: shared hit=1
+               ->  Unique  (cost=5110.17..5290.40 rows=30041 width=54) (actual time=121.741..121.752 rows=20 loops=1)
+                     Buffers: shared hit=1574, temp read=348 written=379
+                     ->  Sort  (cost=5110.17..5200.28 rows=36045 width=54) (actual time=121.740..121.746 rows=30 loops=1)
+                           Sort Key: cs.cust_id, ((COALESCE(cs.prnc_ots, '0'::numeric) + COALESCE(cs.intr_ots, '0'::numeric))) DESC
+                           Sort Method: external merge  Disk: 3024kB
+                           Buffers: shared hit=1574, temp read=348 written=379
+                           ->  Seq Scan on contract_snapshot cs  (cost=0.00..2382.01 rows=36045 width=54) (actual time=0.018..24.947 rows=72090 loops=1)
+                                 Filter: (NOT COALESCE(closed_via_restructure, false))
+                                 Buffers: shared hit=1571
+         ->  GroupAggregate  (cost=5020.06..6041.37 rows=30041 width=22) (actual time=99.238..99.252 rows=20 loops=1)
+               Group Key: cs_1.cust_id
+               Buffers: shared hit=1571, temp read=275 written=302
+               ->  Sort  (cost=5020.06..5110.17 rows=36045 width=22) (actual time=99.221..99.225 rows=31 loops=1)
+                     Sort Key: cs_1.cust_id
+                     Sort Method: external merge  Disk: 2408kB
+                     Buffers: shared hit=1571, temp read=275 written=302
+                     ->  Seq Scan on contract_snapshot cs_1  (cost=0.00..2291.90 rows=36045 width=22) (actual time=0.011..12.278 rows=72090 loops=1)
+                           Filter: (NOT COALESCE(closed_via_restructure, false))
+                           Buffers: shared hit=1571
+ Planning:
+   Buffers: shared hit=281 read=1
+ Planning Time: 1.432 ms
+ Execution Time: 226.915 ms
+(38 rows)
+
+                                                                                  QUERY PLAN                                                                                  
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=43.61..91.70 rows=20 width=140) (actual time=2.352..3.240 rows=20 loops=1)
+   Buffers: shared hit=61 read=10
+   ->  Merge Left Join  (cost=43.61..173388.25 rows=72090 width=140) (actual time=2.351..3.238 rows=20 loops=1)
+         Merge Cond: ((cs.contract_no)::text = (lkp_interaction.contract_no)::text)
+         Buffers: shared hit=61 read=10
+         ->  Merge Left Join  (cost=40.75..28065.28 rows=72090 width=104) (actual time=1.059..1.111 rows=20 loops=1)
+               Merge Cond: ((cs.contract_no)::text = (ai_intelligence_output.contract_no)::text)
+               Buffers: shared hit=54 read=1
+               ->  Nested Loop Left Join  (cost=0.84..27830.30 rows=72090 width=95) (actual time=0.936..0.987 rows=20 loops=1)
+                     Buffers: shared hit=51 read=1
+                     ->  Index Scan using contract_snapshot_pkey on contract_snapshot cs  (cost=0.42..4097.34 rows=72090 width=77) (actual time=0.330..0.334 rows=20 loops=1)
+                           Buffers: shared hit=3 read=1
+                     ->  Memoize  (cost=0.42..0.50 rows=1 width=36) (actual time=0.031..0.031 rows=1 loops=20)
+                           Cache Key: cs.cust_id
+                           Cache Mode: logical
+                           Hits: 8  Misses: 12  Evictions: 0  Overflows: 0  Memory Usage: 2kB
+                           Buffers: shared hit=48
+                           ->  Index Scan using customer_master_pkey on customer_master cm  (cost=0.41..0.49 rows=1 width=36) (actual time=0.003..0.003 rows=1 loops=12)
+                                 Index Cond: ((cust_id)::text = (cs.cust_id)::text)
+                                 Buffers: shared hit=48
+               ->  Unique  (cost=39.91..42.61 rows=540 width=32) (actual time=0.120..0.121 rows=0 loops=1)
+                     Buffers: shared hit=3
+                     ->  Sort  (cost=39.91..41.26 rows=540 width=32) (actual time=0.120..0.120 rows=0 loops=1)
+                           Sort Key: ai_intelligence_output.contract_no, ai_intelligence_output.scoring_date DESC
+                           Sort Method: quicksort  Memory: 25kB
+                           Buffers: shared hit=3
+                           ->  Seq Scan on ai_intelligence_output  (cost=0.00..15.40 rows=540 width=32) (actual time=0.020..0.021 rows=0 loops=1)
+         ->  Unique  (cost=2.86..143847.35 rows=49563 width=29) (actual time=1.288..2.109 rows=20 loops=1)
+               Buffers: shared hit=7 read=9
+               ->  Incremental Sort  (cost=2.86..140103.43 rows=1497570 width=29) (actual time=1.288..2.083 rows=403 loops=1)
+                     Sort Key: lkp_interaction.contract_no, lkp_interaction.action_date DESC
+                     Presorted Key: lkp_interaction.contract_no
+                     Full-sort Groups: 10  Sort Method: quicksort  Average Memory: 26kB  Peak Memory: 26kB
+                     Pre-sorted Groups: 4  Sort Method: quicksort  Average Memory: 25kB  Peak Memory: 25kB
+                     Buffers: shared hit=7 read=9
+                     ->  Index Scan using idx_lkp_ptp_status on lkp_interaction  (cost=0.43..83573.17 rows=1497570 width=29) (actual time=1.241..1.777 rows=452 loops=1)
+                           Buffers: shared hit=7 read=9
+ Planning:
+   Buffers: shared hit=161 read=9
+ Planning Time: 5.249 ms
+ Execution Time: 3.296 ms
+(41 rows)
+
+                                                                                         QUERY PLAN                                                                                          
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Nested Loop Left Join  (cost=4953.04..4969.15 rows=1 width=114) (actual time=23.619..23.623 rows=1 loops=1)
+   Buffers: shared hit=3152
+   InitPlan 1
+     ->  Limit  (cost=0.00..0.03 rows=1 width=18) (actual time=0.004..0.004 rows=1 loops=1)
+           Buffers: shared hit=2
+           ->  Seq Scan on customer_master  (cost=0.00..1324.00 rows=50000 width=18) (actual time=0.003..0.003 rows=1 loops=1)
+                 Buffers: shared hit=2
+   ->  Nested Loop Left Join  (cost=4944.84..4960.93 rows=1 width=99) (actual time=23.606..23.609 rows=1 loops=1)
+         Buffers: shared hit=3150
+         ->  Nested Loop Left Join  (cost=2472.70..2488.76 rows=1 width=80) (actual time=11.510..11.512 rows=1 loops=1)
+               Buffers: shared hit=1579
+               ->  Nested Loop Left Join  (cost=0.56..16.61 rows=1 width=48) (actual time=0.010..0.012 rows=1 loops=1)
+                     Buffers: shared hit=8
+                     ->  Index Scan using customer_master_pkey on customer_master cm  (cost=0.41..8.43 rows=1 width=36) (actual time=0.009..0.010 rows=1 loops=1)
+                           Index Cond: ((cust_id)::text = ((InitPlan 1).col1)::text)
+                           Buffers: shared hit=6
+                     ->  Index Scan using customer_behavioral_standing_pkey on customer_behavioral_standing cbs  (cost=0.15..8.17 rows=1 width=30) (actual time=0.001..0.001 rows=0 loops=1)
+                           Index Cond: ((cust_id)::text = ((InitPlan 1).col1)::text)
+                           Buffers: shared hit=2
+               ->  Aggregate  (cost=2472.13..2472.14 rows=1 width=32) (actual time=11.498..11.499 rows=1 loops=1)
+                     Buffers: shared hit=1571
+                     ->  Seq Scan on contract_snapshot  (cost=0.00..2472.12 rows=1 width=16) (actual time=0.003..11.493 rows=1 loops=1)
+                           Filter: ((NOT COALESCE(closed_via_restructure, false)) AND ((cust_id)::text = (cm.cust_id)::text))
+                           Rows Removed by Filter: 72089
+                           Buffers: shared hit=1571
+         ->  Limit  (cost=2472.14..2472.14 rows=1 width=51) (actual time=12.094..12.094 rows=1 loops=1)
+               Buffers: shared hit=1571
+               ->  Sort  (cost=2472.14..2472.14 rows=1 width=51) (actual time=12.093..12.094 rows=1 loops=1)
+                     Sort Key: ((COALESCE(contract_snapshot_1.prnc_ots, '0'::numeric) + COALESCE(contract_snapshot_1.intr_ots, '0'::numeric))) DESC
+                     Sort Method: quicksort  Memory: 25kB
+                     Buffers: shared hit=1571
+                     ->  Seq Scan on contract_snapshot contract_snapshot_1  (cost=0.00..2472.13 rows=1 width=51) (actual time=0.004..12.089 rows=1 loops=1)
+                           Filter: ((NOT COALESCE(closed_via_restructure, false)) AND ((cust_id)::text = (cm.cust_id)::text))
+                           Rows Removed by Filter: 72089
+                           Buffers: shared hit=1571
+   ->  Limit  (cost=8.18..8.18 rows=1 width=38) (actual time=0.010..0.010 rows=0 loops=1)
+         Buffers: shared hit=2
+         ->  Sort  (cost=8.18..8.18 rows=1 width=38) (actual time=0.009..0.010 rows=0 loops=1)
+               Sort Key: ai_intelligence_output.scoring_date DESC
+               Sort Method: quicksort  Memory: 25kB
+               Buffers: shared hit=2
+               ->  Index Scan using ai_intelligence_output_pkey on ai_intelligence_output  (cost=0.15..8.17 rows=1 width=38) (actual time=0.004..0.004 rows=0 loops=1)
+                     Index Cond: ((contract_no)::text = (contract_snapshot_1.contract_no)::text)
+                     Buffers: shared hit=2
+ Planning:
+   Buffers: shared hit=12 read=2
+ Planning Time: 0.511 ms
+ Execution Time: 23.659 ms
+(48 rows)
+
+                                                                                                                                                          QUERY PLAN                                                                                                                                                           
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Finalize GroupAggregate  (cost=4704.12..4742.47 rows=260 width=40) (actual time=13.894..14.704 rows=4 loops=1)
+   Group Key: (CASE WHEN ((cs.dpd_current >= 1) AND (cs.dpd_current <= 30)) THEN 'C0'::text WHEN ((cs.dpd_current >= 31) AND (cs.dpd_current <= 60)) THEN 'C1'::text WHEN ((cs.dpd_current >= 61) AND (cs.dpd_current <= 90)) THEN 'C2'::text WHEN (cs.dpd_current > 90) THEN 'C3+'::text ELSE NULL::text END)
+   Buffers: shared hit=1579
+   ->  Gather Merge  (cost=4704.12..4734.02 rows=260 width=40) (actual time=13.888..14.698 rows=8 loops=1)
+         Workers Planned: 1
+         Workers Launched: 1
+         Buffers: shared hit=1579
+         ->  Sort  (cost=3704.11..3704.76 rows=260 width=40) (actual time=8.504..8.505 rows=4 loops=2)
+               Sort Key: (CASE WHEN ((cs.dpd_current >= 1) AND (cs.dpd_current <= 30)) THEN 'C0'::text WHEN ((cs.dpd_current >= 31) AND (cs.dpd_current <= 60)) THEN 'C1'::text WHEN ((cs.dpd_current >= 61) AND (cs.dpd_current <= 90)) THEN 'C2'::text WHEN (cs.dpd_current > 90) THEN 'C3+'::text ELSE NULL::text END)
+               Sort Method: quicksort  Memory: 25kB
+               Buffers: shared hit=1579
+               Worker 0:  Sort Method: quicksort  Memory: 25kB
+               ->  Partial HashAggregate  (cost=3686.53..3693.68 rows=260 width=40) (actual time=8.482..8.484 rows=4 loops=2)
+                     Group Key: CASE WHEN ((cs.dpd_current >= 1) AND (cs.dpd_current <= 30)) THEN 'C0'::text WHEN ((cs.dpd_current >= 31) AND (cs.dpd_current <= 60)) THEN 'C1'::text WHEN ((cs.dpd_current >= 61) AND (cs.dpd_current <= 90)) THEN 'C2'::text WHEN (cs.dpd_current > 90) THEN 'C3+'::text ELSE NULL::text END
+                     Batches: 1  Memory Usage: 37kB
+                     Buffers: shared hit=1571
+                     Worker 0:  Batches: 1  Memory Usage: 37kB
+                     ->  Parallel Seq Scan on contract_snapshot cs  (cost=0.00..3475.56 rows=42194 width=32) (actual time=0.010..6.044 rows=18055 loops=2)
+                           Filter: (CASE WHEN ((dpd_current >= 1) AND (dpd_current <= 30)) THEN 'C0'::text WHEN ((dpd_current >= 31) AND (dpd_current <= 60)) THEN 'C1'::text WHEN ((dpd_current >= 61) AND (dpd_current <= 90)) THEN 'C2'::text WHEN (dpd_current > 90) THEN 'C3+'::text ELSE NULL::text END IS NOT NULL)
+                           Rows Removed by Filter: 17990
+                           Buffers: shared hit=1571
+ Planning:
+   Buffers: shared hit=5 read=1
+ Planning Time: 0.290 ms
+ Execution Time: 14.728 ms
+(25 rows)
+
+ schemaname |         table_name         |                 index_name                  | idx_scan 
+------------+----------------------------+---------------------------------------------+----------
+ public     | ai_intelligence_output     | idx_ai_output_cust                          |        0
+ public     | ai_reasoning_output        | ai_reasoning_output_pkey                    |        0
+ public     | asset_appraisal            | asset_appraisal_pkey                        |        0
+ public     | lkp_interaction            | lkp_interaction_pkey                        |        0
+ public     | model_governance_audit_log | idx_governance_audit_performed_at           |        0
+ public     | model_governance_audit_log | model_governance_audit_log_pkey             |        0
+ public     | model_monitoring_log       | model_monitoring_log_pkey                   |        0
+ public     | product_conversion_mapping | product_conversion_mapping_pkey             |        0
+ public     | restructuring_approval_log | restructuring_approval_log_pkey             |        0
+ public     | restructuring_group_map    | idx_restructure_group_cust                  |        0
+ public     | restructuring_history      | restructuring_history_pkey                  |        0
+ public     | scoring_labels             | scoring_labels_contract_no_scoring_date_key |        0
+ public     | scoring_labels             | scoring_labels_pkey                         |        0
+ public     | scoring_labels             | idx_labels_date                             |        0
+ public     | shadow_scores              | idx_shadow_model_type                       |        0
+ public     | shadow_scores              | shadow_scores_pkey                          |        0
+ public     | shadow_scores              | idx_shadow_date                             |        0
+ public     | users                      | users_pkey                                  |        0
+ public     | users                      | users_username_key                          |        0
+ public     | users                      | ix_users_username                           |        0
+(20 rows)
+
+             table_name              | seq_scan | seq_tup_read | idx_scan | total_size 
+-------------------------------------+----------+--------------+----------+------------
+ contract_snapshot                   |      779 |      2002348 |     2432 | 15 MB
+ users                               |      389 |          659 |        0 | 96 kB
+ ai_intelligence_output              |      351 |       638104 |      656 | 32 kB
+ customer_master                     |      275 |       403578 |    28580 | 8640 kB
+ restructuring_recommendation_output |      200 |       530598 |      875 | 24 kB
+ restructuring_group_map             |      164 |       678567 |      384 | 16 kB
+ lkp_interaction                     |      123 |      9312882 |    42418 | 251 MB
+ payment_history                     |       69 |      2731956 |       52 | 118 MB
+ model_governance_audit_log          |       53 |          208 |        0 | 48 kB
+ customer_behavioral_standing        |       49 |        31359 |      773 | 8192 bytes
+ ai_reasoning_output                 |       45 |           42 |       53 | 32 kB
+ shadow_scores                       |       30 |            0 |        0 | 24 kB
+ scoring_labels                      |       30 |            0 |        0 | 24 kB
+ model_monitoring_log                |       24 |           36 |        0 | 16 kB
+ restructuring_approval_log          |       20 |            0 |      110 | 16 kB
+(15 rows)
+

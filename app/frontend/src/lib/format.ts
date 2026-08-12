@@ -53,3 +53,12 @@ export function formatDateTimeHuman(value: string | null | undefined): string {
   if (parts.hh === null || parts.mm === null) return datePart;
   return `${datePart} pukul ${String(parts.hh).padStart(2, '0')}:${String(parts.mm).padStart(2, '0')}`;
 }
+
+// Step duration (Sync AI Intelligence, TASK-P1) — "42 detik" / "1m 5detik".
+export function formatDurationSeconds(value: number | null | undefined): string {
+  if (value === null || value === undefined) return '—';
+  if (value < 60) return `${value.toFixed(1)} detik`;
+  const minutes = Math.floor(value / 60);
+  const seconds = Math.round(value % 60);
+  return `${minutes}m ${seconds}detik`;
+}

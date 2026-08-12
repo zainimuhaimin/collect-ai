@@ -12,7 +12,14 @@ from __future__ import annotations
 
 import json
 
-PROMPT_VERSION = "v1"
+# v1 -> v2 (post-presentation-review-tasks.md TASK-E2/E3): (1) nbaAgreement
+# dihapus dari response schema — dihitung deterministik di
+# ai_reasoning_service.py, bukan lagi self-report LLM; (2) klaim "rule engine
+# tidak pernah menghasilkan Pickup" diperbaiki — TERBUKTI SALAH lewat query
+# nyata setelah perbaikan historical_default_count (Fase 0): 10 dari 711
+# kontrak (1,4%) di run verifikasi 2026-08-11 menghasilkan Pickup
+# (SELECT nba_recommendation, count(*) FROM ai_intelligence_output GROUP BY 1).
+PROMPT_VERSION = "v2"
 
 # SAMA dengan app/machine-learning/src/business_rules.py:27 CHANNEL_RANK.
 # TIDAK di-import langsung — backend SENGAJA tidak mengimpor modul ml/ ke
@@ -32,7 +39,7 @@ Aturan wajib:
 - Urgensi mengikuti kontrak TERBURUK (field worst_* pada portfolio_rollup), bukan rata-rata.
 - Pertimbangkan collection_sensitivity pada customer_profile sebagai preferensi channel debitur; boleh menyimpang kalau tingkat keparahan menuntut, tapi sebutkan alasannya.
 - payment_history di setiap kontrak hanya mencatat pembayaran yang TERJADI; angsuran yang tidak dibayar TIDAK muncul sebagai baris. Nilai tunggakan dari dpd_current dan overdue_installment_count pada kontrak, JANGAN disimpulkan dari jumlah baris pembayaran.
-- nba_recommendation per kontrak adalah hasil rule engine deterministik dengan cakupan terbatas — ia tidak pernah menghasilkan "Pickup", dan tidak mempertimbangkan portofolio debitur secara keseluruhan. Perlakukan sebagai rekomendasi sistem saat ini yang perlu Anda rekonsiliasi, BUKAN sebagai batas atas tindakan yang boleh Anda usulkan. nba_trigger menjelaskan kondisi apa yang memicu rekomendasi itu — nilai apakah alasannya masih berlaku ketika seluruh kontrak debitur dilihat bersamaan.
+- nba_recommendation per kontrak adalah hasil rule engine deterministik dengan cakupan terbatas — ia HANYA menghasilkan "Pickup" pada kondisi yang sangat sempit (segmen won't-pay, saldo besar, riwayat gagal bayar berulang), dan tidak mempertimbangkan portofolio debitur secara keseluruhan. Perlakukan sebagai rekomendasi sistem saat ini yang perlu Anda rekonsiliasi, BUKAN sebagai batas atas tindakan yang boleh Anda usulkan — Anda boleh mengusulkan tindakan yang lebih ringan ATAU lebih berat dari nba_recommendation kalau data portofolio menuntutnya. nba_trigger menjelaskan kondisi apa yang memicu rekomendasi itu — nilai apakah alasannya masih berlaku ketika seluruh kontrak debitur dilihat bersamaan.
 - Field yang TIDAK ADA di JSON berarti tidak tersedia — jangan diasumsikan nol, dan jangan mengarang angka yang tidak ada di input. available_models memberi tahu model skor apa yang tersedia; skor dari model yang tidak terdaftar memang tidak ada, bukan bernilai rendah.
 
 Jawab dalam Bahasa Indonesia, ringkas, berbasis data yang diberikan."""
@@ -47,7 +54,16 @@ def build_response_schema() -> dict:
     mode) — bukan cuma diminta lewat teks prompt. Tetap divalidasi ulang ke
     Pydantic (schemas/ai_reasoning.py) sebelum disimpan; pelanggaran skema di
     sisi Gemini sendiri seharusnya tidak lolos, tapi validasi ulang tetap
-    wajib (jangan percaya buta pada satu lapis saja)."""
+    wajib (jangan percaya buta pada satu lapis saja).
+
+    TIDAK ADA field nbaAgreement (AGREE/DIFFER) di sini secara sengaja — versi
+    lama meminta LLM menilai sendiri apakah pilihannya "setuju" dengan rule
+    engine, padahal kata itu tidak pernah didefinisikan di system instruction
+    manapun, sehingga model menebak semantiknya dari nama field dan hasilnya
+    tidak bisa diverifikasi. Sekarang dihitung deterministik di
+    ai_reasoning_service.py: AGREE kalau primaryNbaAction ada di nba_spread
+    (compute_nba_spread di ai_reasoning_payload.py), DIFFER kalau tidak, None
+    kalau nba_spread kosong (tidak ada rekomendasi rule untuk dibandingkan)."""
     return {
         "type": "OBJECT",
         "properties": {
@@ -56,7 +72,6 @@ def build_response_schema() -> dict:
             "keyFactors": {"type": "ARRAY", "items": {"type": "STRING"}},
             "primaryNbaAction": {"type": "STRING", "enum": NBA_ACTIONS},
             "primaryNbaRationale": {"type": "STRING"},
-            "nbaAgreement": {"type": "STRING", "enum": ["AGREE", "DIFFER"]},
             "perContractFocus": {
                 "type": "ARRAY",
                 "items": {
@@ -73,7 +88,7 @@ def build_response_schema() -> dict:
         },
         "required": [
             "summary", "customerTreatmentStrategy", "keyFactors",
-            "primaryNbaAction", "primaryNbaRationale", "nbaAgreement",
+            "primaryNbaAction", "primaryNbaRationale",
             "perContractFocus", "consistencyNote",
         ],
     }

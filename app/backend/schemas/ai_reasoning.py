@@ -43,7 +43,10 @@ class GeminiReasoningOutputSchema(BaseModel):
     key_factors: List[str] = Field(alias="keyFactors")
     primary_nba_action: str = Field(alias="primaryNbaAction", description=f"Harus salah satu dari: {NBA_ACTIONS}")
     primary_nba_rationale: str = Field(alias="primaryNbaRationale")
-    nba_agreement: str = Field(alias="nbaAgreement", description="AGREE | DIFFER")
+    # nba_agreement SENGAJA tidak ada di sini — dihitung deterministik di
+    # ai_reasoning_service.py (bandingkan primary_nba_action vs nba_spread),
+    # bukan lagi self-report LLM. Lihat catatan di
+    # ai_reasoning_prompt.py::build_response_schema().
     per_contract_focus: List[_GeminiPerContractFocusSchema] = Field(alias="perContractFocus")
     consistency_note: str = Field(alias="consistencyNote")
 
@@ -68,7 +71,7 @@ class AiReasoningResponseSchema(BaseModel):
                 "insufficient_reason": None,
                 "stale": False,
                 "generated_at": "2026-08-05T10:00:00",
-                "prompt_version": "v1",
+                "prompt_version": "v2",
                 "model_used": "gemini-2.0-flash",
                 "summary": "Debitur memiliki 3 kontrak aktif dengan total OTS Rp 45 juta...",
                 "customer_treatment_strategy": "Tangani sebagai satu debitur dengan pendekatan kunjungan langsung...",
@@ -105,7 +108,12 @@ class AiReasoningResponseSchema(BaseModel):
     key_factors: List[str] = []
     primary_nba_action: Optional[str] = None
     primary_nba_rationale: Optional[str] = None
-    nba_agreement: Optional[str] = None
+    nba_agreement: Optional[str] = Field(
+        default=None,
+        description="AGREE | DIFFER — dihitung server-side dari primary_nba_action vs "
+        "nba_spread rule engine, BUKAN dinilai sendiri oleh LLM. None kalau tidak ada "
+        "kontrak yang discoring rule engine untuk dibandingkan.",
+    )
     per_contract_focus: List[PerContractFocusSchema] = []
     consistency_note: Optional[str] = None
     analyzed_contract_nos: List[str] = []

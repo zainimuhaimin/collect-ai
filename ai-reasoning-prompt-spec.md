@@ -79,7 +79,7 @@ Aturan wajib:
 - Urgensi mengikuti kontrak TERBURUK (field worst_* pada portfolio_rollup), bukan rata-rata.
 - Pertimbangkan collection_sensitivity pada customer_profile sebagai preferensi channel debitur; boleh menyimpang kalau tingkat keparahan menuntut, tapi sebutkan alasannya.
 - payment_history di setiap kontrak hanya mencatat pembayaran yang TERJADI; angsuran yang tidak dibayar TIDAK muncul sebagai baris. Nilai tunggakan dari dpd_current dan overdue_installment_count pada kontrak, JANGAN disimpulkan dari jumlah baris pembayaran.
-- nba_recommendation per kontrak adalah hasil rule engine deterministik dengan cakupan terbatas — ia tidak pernah menghasilkan "Pickup", dan tidak mempertimbangkan portofolio debitur secara keseluruhan. Perlakukan sebagai rekomendasi sistem saat ini yang perlu Anda rekonsiliasi, BUKAN sebagai batas atas tindakan yang boleh Anda usulkan. nba_trigger menjelaskan kondisi apa yang memicu rekomendasi itu — nilai apakah alasannya masih berlaku ketika seluruh kontrak debitur dilihat bersamaan.
+- nba_recommendation per kontrak adalah hasil rule engine deterministik dengan cakupan terbatas — ia HANYA menghasilkan "Pickup" pada kondisi yang sangat sempit (segmen won't-pay, saldo besar, riwayat gagal bayar berulang), dan tidak mempertimbangkan portofolio debitur secara keseluruhan. Perlakukan sebagai rekomendasi sistem saat ini yang perlu Anda rekonsiliasi, BUKAN sebagai batas atas tindakan yang boleh Anda usulkan — Anda boleh mengusulkan tindakan yang lebih ringan ATAU lebih berat dari nba_recommendation kalau data portofolio menuntutnya. nba_trigger menjelaskan kondisi apa yang memicu rekomendasi itu — nilai apakah alasannya masih berlaku ketika seluruh kontrak debitur dilihat bersamaan.
 - Field yang TIDAK ADA di JSON berarti tidak tersedia — jangan diasumsikan nol, dan jangan mengarang angka yang tidak ada di input. available_models memberi tahu model skor apa yang tersedia; skor dari model yang tidak terdaftar memang tidak ada, bukan bernilai rendah.
 
 Jawab dalam Bahasa Indonesia, ringkas, berbasis data yang diberikan.
@@ -89,7 +89,7 @@ Jawab dalam Bahasa Indonesia, ringkas, berbasis data yang diberikan.
 
 | Aturan | Masalah yang dicegah |
 |---|---|
-| "BUKAN sebagai batas atas tindakan" | Rule engine per kontrak tidak pernah menghasilkan `Pickup` dan cenderung lebih konservatif dari kondisi gabungan — tanpa kalimat ini Gemini akan membatasi diri ke opsi yang sudah ada di data, padahal justru itu yang ingin diperbaiki (rekonsiliasi lintas kontrak) |
+| "BUKAN sebagai batas atas tindakan" | Rule engine per kontrak hanya menghasilkan `Pickup` pada kondisi sempit dan cenderung lebih konservatif dari kondisi gabungan — tanpa kalimat ini Gemini akan membatasi diri ke opsi yang sudah ada di data, padahal justru itu yang ingin diperbaiki (rekonsiliasi lintas kontrak). *(Catatan v2: sebelumnya dokumen ini — dan system instruction-nya — menyatakan rule engine "tidak pernah" menghasilkan Pickup. Klaim itu keliru: setelah perbaikan `historical_default_count`, verifikasi query nyata 2026-08-11 menunjukkan Pickup muncul 10/711 kontrak (1,4%). Diperbaiki di `PROMPT_VERSION="v2"`, lihat §7.)* |
 | Larangan menyimpulkan tunggakan dari panjang `payment_history` | Tabel itu hanya mencatat pembayaran yang **terjadi** — kontrak yang macet total punya array pendek, bukan array berisi baris "UNPAID". Tanpa aturan ini Gemini salah membaca "sedikit riwayat" sebagai "sedikit masalah" |
 | "jangan diasumsikan nol" + `available_models` | Mengulang bug temuan #17 (skor yang *hilang* dari sistem — belum ada model-nya — disalahtafsirkan sebagai skor *rendah*) |
 | Urgensi ikut `worst_*`, bukan rata-rata | Debitur dengan 1 kontrak C3+ dan 2 kontrak C0 tidak boleh "diselamatkan" jadi rata-rata C1 — satu kontrak parah cukup untuk mengangkat urgensi seluruh debitur |
@@ -148,6 +148,9 @@ di atas (tidak ada structured `contents` per field).
       ],
       "risk_segment": "Won't Pay",
       "recovery_score": 0.2463,
+      "self_cure_probability": 0.0721,          // BARU di v2 (E1) — sebelumnya tidak dikirim
+      "ptp_success_probability": 0.1105,        // BARU di v2 (E1) — sebelumnya tidak dikirim
+      "roll_forward_risk_prob_not_paying": 0.8029, // BARU di v2 (E1) — nama self-describing, sama pola dengan rollup
       "nba_recommendation": "Somasi",
       "nba_trigger": "base:wont_pay_mid_ots"
     }
@@ -155,6 +158,13 @@ di atas (tidak ada structured `contents` per field).
   ]
 }
 ```
+
+> **Catatan v2 (E1):** payload di atas ditulis sebelum perbaikan "lengkapi skor
+> model" — dulu `available_models` mengiklankan 4 model tapi hanya
+> `recovery_score` yang benar-benar dikirim per kontrak. Tiga baris berkomentar
+> "BARU di v2" di atas menunjukkan field yang sekarang ditambahkan; nilainya
+> ilustratif (bukan dari payload asli yang di-capture, karena payload asli
+> berasal dari sebelum perbaikan ini ada).
 
 > Contoh di atas adalah payload nyata (disamarkan `cust_id`) hasil generate
 > langsung dari `build_payload()` terhadap data live — bukan data rekaan.
@@ -198,7 +208,6 @@ teks:
       "enum": ["WA", "Deskcoll", "Visit", "Somasi", "Pickup"]
     },
     "primaryNbaRationale": { "type": "STRING" },
-    "nbaAgreement": { "type": "STRING", "enum": ["AGREE", "DIFFER"] },
     "perContractFocus": {
       "type": "ARRAY",
       "items": {
@@ -215,11 +224,20 @@ teks:
   },
   "required": [
     "summary", "customerTreatmentStrategy", "keyFactors",
-    "primaryNbaAction", "primaryNbaRationale", "nbaAgreement",
+    "primaryNbaAction", "primaryNbaRationale",
     "perContractFocus", "consistencyNote"
   ]
 }
 ```
+
+> **Catatan v2:** `nbaAgreement` (AGREE/DIFFER) DIHAPUS dari skema ini.
+> Sebelumnya LLM diminta menilai sendiri apakah pilihannya "setuju" dengan rule
+> engine, padahal kata itu tidak pernah didefinisikan di system instruction
+> manapun — model menebak semantiknya dari nama field, dan hasilnya tidak bisa
+> diverifikasi. Field `nba_agreement` di response API (§5) **tetap ada**, tapi
+> sekarang dihitung deterministik di `ai_reasoning_service.py`: `AGREE` kalau
+> `primaryNbaAction` ada di `nba_spread` (§3), `DIFFER` kalau tidak, `None`
+> kalau `nba_spread` kosong (tidak ada rekomendasi rule untuk dibandingkan).
 
 Field ini dikirim dalam **camelCase** (kontrak Gemini), lalu dikonversi ke
 `snake_case` untuk API publik backend — lihat §5.
@@ -227,6 +245,13 @@ Field ini dikirim dalam **camelCase** (kontrak Gemini), lalu dikonversi ke
 ---
 
 ## 5. Contoh nyata ujung ke ujung
+
+> **Catatan v2:** contoh di bawah adalah panggilan nyata dari `PROMPT_VERSION="v1"`
+> (sebelum payload dilengkapi §1.1/E1 dan sebelum `nbaAgreement` dihapus/E2).
+> `nbaAgreement` di respons ini adalah nilai self-report LLM lama — pada v2,
+> field yang sama (`nba_agreement` di response API) dihitung server-side, lihat
+> catatan v2 di §4. Bentuk respons lainnya (summary, keyFactors, dst) tidak
+> berubah.
 
 Payload di §3 (untuk debitur 3-kontrak dengan `nba_spread: ["Somasi","Visit","WA"]`,
 kontrak terparah `Won't Pay` DPD 136) menghasilkan output nyata berikut dari
@@ -283,7 +308,7 @@ hasil AI asli (lihat `AiReasoningCard.tsx`).
 
 ## 7. Versioning & cache
 
-`PROMPT_VERSION = "v1"` (di `ai_reasoning_prompt.py`) adalah bagian dari
+`PROMPT_VERSION = "v2"` (di `ai_reasoning_prompt.py`) adalah bagian dari
 `UNIQUE (cust_id, source_signature, prompt_version)` di tabel
 `ai_reasoning_output`. Begitu system instruction atau response schema di atas
 berubah secara substantif, **versi ini wajib dinaikkan** — supaya:

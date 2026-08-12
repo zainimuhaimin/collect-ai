@@ -16,7 +16,7 @@ from domain.models import AiReasoningRecord
 from repositories.interfaces import IAiReasoningRepository, IContractRepository, ICustomerRepository
 from schemas.ai_reasoning import GeminiReasoningOutputSchema
 from services.ai_reasoning_gate import data_sufficiency
-from services.ai_reasoning_payload import available_models, build_payload, compute_source_signature
+from services.ai_reasoning_payload import available_models, build_payload, compute_nba_spread, compute_source_signature
 from services.ai_reasoning_prompt import NBA_ACTIONS, PROMPT_VERSION, build_instruction, build_response_schema, parse_response_text
 from services.gemini_client import GeminiClient, GeminiError
 
@@ -83,6 +83,13 @@ class AiReasoningService:
     # ── POST /customers/{cust_id}/ai-reasoning ─────────────────────────
 
     def generate(self, cust_id: str, force: bool = False) -> AiReasoningOutcome:
+        # NOTE (TASK-E6): `include_rule_nba` TIDAK di-thread ke sini secara
+        # sengaja — mengalirkannya sampai ke sini akan membuat hasil ablation
+        # (variant B, tanpa rule NBA) tersimpan ke ai_reasoning_output dengan
+        # cache key yang SAMA seperti hasil produksi normal, mencampur dua
+        # populasi yang seharusnya terpisah. `scripts/ablation_nba.py`
+        # memanggil `build_payload()` + `GeminiClient.generate()` LANGSUNG,
+        # bypass service ini sepenuhnya — tidak menyentuh cache/DB produksi.
         if not self._customers.exists(cust_id):
             return AiReasoningOutcome(ok=False, error_code="NOT_FOUND")
         if not settings.ai_reasoning_enabled:
@@ -123,6 +130,15 @@ class AiReasoningService:
                 raise GeminiError("Gemini client belum dikonfigurasi", kind="http")
             result = self._gemini.generate(build_instruction(), payload, build_response_schema())
             parsed = GeminiReasoningOutputSchema.model_validate(parse_response_text(result.text))
+            # AGREE/DIFFER dihitung di sini, BUKAN self-report LLM (lihat catatan
+            # di ai_reasoning_prompt.py::build_response_schema()). None kalau
+            # tidak ada kontrak yang discoring rule engine untuk dibandingkan.
+            nba_spread = compute_nba_spread(active_contracts)
+            nba_agreement = (
+                ("AGREE" if parsed.primary_nba_action in nba_spread else "DIFFER")
+                if nba_spread
+                else None
+            )
             record = AiReasoningRecord(
                 cust_id=cust_id, source_signature=signature, prompt_version=PROMPT_VERSION,
                 status="OK", model_used=result.model_used, generated_at=datetime.now(),
@@ -131,7 +147,7 @@ class AiReasoningService:
                 key_factors=parsed.key_factors,
                 primary_nba_action=parsed.primary_nba_action,
                 primary_nba_rationale=parsed.primary_nba_rationale,
-                nba_agreement=parsed.nba_agreement,
+                nba_agreement=nba_agreement,
                 per_contract_focus=[f.model_dump() for f in parsed.per_contract_focus],
                 consistency_note=parsed.consistency_note,
                 analyzed_contract_nos=contract_nos,

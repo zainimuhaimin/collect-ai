@@ -8,8 +8,9 @@ Dua script yang perlu Anda ketahui:
 
 | Script | Fungsi |
 |---|---|
-| `generate-faker-realistic.py` | **Generator utama — pakai ini.** |
+| `generate-faker-realistic.py` | **Generator utama — pakai ini** untuk data demo/training/evaluasi akurasi. |
 | `validate_leakage.py` | Audit otomatis: kebocoran data, realisme distribusi, AUC held-out |
+| `bulk_clone.py` | **KHUSUS uji performa (Area 1)** — generate benih kecil lewat simulator asli lalu replikasi+perturbasi via `COPY` untuk mencapai skala besar (100rb-1jt+ customer) dengan cepat. ⚠️ **Data hasilnya TIDAK VALID untuk evaluasi akurasi Area 3** (latents tidak lagi berkorespondensi 1:1 dengan baris hasil replikasi) — dipakai HANYA oleh `perf/benchmark_scale.py`, tidak pernah menulis `_audit_latents.parquet`. Jangan dipakai untuk training model yang angkanya dilaporkan. |
 | `generate-dataset.py` | Generator lama, **deprecated**. Ditinggalkan karena label-nya bocor (lihat di bawah) |
 
 ---

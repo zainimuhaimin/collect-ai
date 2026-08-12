@@ -1,3 +1,4 @@
+import io
 import os
 
 import pandas as pd
@@ -102,18 +103,22 @@ def _table_row_count(engine, table_name):
         return None
 
 
-def reset_tables(table_names, include_derived=True):
+def reset_tables(table_names, include_derived=True, table_prefix=''):
     """TRUNCATE the given tables (and, by default, the derived ML tables that
     reference them) before a re-run. Re-running the generator with the same
     seed produces the same deterministic PKs (CUST-00001, PAY-0000001, ...),
     so a plain append collides on the second run — this makes re-runs safe
-    instead of relying on the swallowed-exception behavior this replaces."""
+    instead of relying on the swallowed-exception behavior this replaces.
+
+    ``table_prefix`` (TASK-S2): TRUNCATE ``{prefix}{table_name}`` instead —
+    staging tables (``stg_``) don't have derived ML tables of their own, so
+    callers should pass ``include_derived=False`` alongside a prefix."""
     engine = create_postgres_engine_from_env()
     if engine is None or text is None:
         print('sqlalchemy not installed; skipping reset.')
         return
 
-    targets = list(table_names)
+    targets = [f'{table_prefix}{t}' for t in table_names]
     if include_derived:
         targets = targets + DERIVED_ML_TABLES
 
@@ -126,21 +131,65 @@ def reset_tables(table_names, include_derived=True):
     print(f'Truncated: {", ".join(existing)}')
 
 
-def append_dataframes_to_postgres(dfs, if_exists='append', require_empty=True):
-    """Append multiple dataframes into PostgreSQL tables.
+def _collapse_whole_number_floats(df):
+    """Kolom float yang SEMUA nilainya bilangan bulat ditulis tanpa ".0" —
+    parser literal teks COPY untuk kolom integer PostgreSQL menolak "37.0",
+    beda dari to_sql lama yang lolos lewat cast numeric->bigint psycopg2.
+    Nilai numeriknya tidak berubah ("37" == "37.0"), aman untuk kolom
+    integer maupun fractional yang kebetulan bulat di batch ini."""
+    out = df.copy()
+    for col in out.columns:
+        if out[col].dtype.kind == 'f':
+            non_null = out[col].dropna()
+            if len(non_null) > 0 and (non_null == non_null.round()).all():
+                out[col] = out[col].astype('Int64')
+    return out
+
+
+def _copy_dataframe(engine, table_name, df):
+    """Tulis dataframe ke tabel via PostgreSQL COPY (TASK-P3) — pengganti
+    `to_sql(method='multi', chunksize=1000)`. INSERT batch kecil terlalu
+    lambat untuk puluhan juta baris; ini prasyarat semua rung besar di
+    ladder P4/P6 (5K -> 5M customer). `df.columns` HARUS persis nama kolom
+    tabel tujuan (sudah dijamin oleh `prepare_dataframe_for_table`)."""
+    df = _collapse_whole_number_floats(df)
+    buf = io.StringIO()
+    df.to_csv(buf, index=False, header=False, na_rep='')
+    buf.seek(0)
+    with engine.begin() as conn:
+        cursor = conn.connection.cursor()
+        columns = ', '.join(df.columns)
+        cursor.copy_expert(
+            f"COPY {table_name} ({columns}) FROM STDIN WITH (FORMAT csv, NULL '')", buf
+        )
+
+
+def append_dataframes_to_postgres(dfs, if_exists='append', require_empty=True, table_prefix=''):
+    """Append multiple dataframes into PostgreSQL tables via COPY (TASK-P3).
 
     If require_empty is True (the default when --reset was not passed), refuse
     to write into a table that already has rows, rather than attempting an
     append that would collide on the faker's deterministic primary keys and
     fail — this used to be swallowed by a bare `except Exception: print(...)`,
     which let a partially-loaded DB go unnoticed.
+
+    ``if_exists`` kept for signature compatibility (callers may still pass
+    it), but COPY only ever appends — creating a missing table is the
+    caller's job (schema.sql), same assumption `to_sql(if_exists='append')`
+    already made in practice (this generator never runs against a DB
+    without schema.sql applied).
+
+    ``table_prefix`` (TASK-S2): write to ``{prefix}{table_name}`` instead of
+    the live table — used to populate ``stg_*`` staging tables without ever
+    touching the live tables the application reads.
     """
     engine = create_postgres_engine_from_env()
     if engine is None:
         print('sqlalchemy not installed; skipping DB write.')
         return
 
-    for table_name, df in dfs.items():
+    for logical_name, df in dfs.items():
+        table_name = f'{table_prefix}{logical_name}'
         if df is None or df.empty:
             print(f'Skip empty dataframe for table {table_name}')
             continue
@@ -155,13 +204,6 @@ def append_dataframes_to_postgres(dfs, if_exists='append', require_empty=True):
                 )
 
         known_columns = _table_columns(engine, table_name)
-        prepared = prepare_dataframe_for_table(table_name, df, known_columns=known_columns)
-        print(f'Writing {len(prepared)} rows to table {table_name} (if_exists={if_exists})')
-        prepared.to_sql(
-            table_name,
-            con=engine,
-            if_exists=if_exists,
-            index=False,
-            method='multi',
-            chunksize=1000,
-        )
+        prepared = prepare_dataframe_for_table(logical_name, df, known_columns=known_columns)
+        print(f'Writing {len(prepared)} rows to table {table_name} via COPY')
+        _copy_dataframe(engine, table_name, prepared)

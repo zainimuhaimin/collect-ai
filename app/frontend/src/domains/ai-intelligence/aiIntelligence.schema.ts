@@ -89,6 +89,10 @@ export const syncStepSchema = z.object({
   modelType: z.string(),
   action: z.string(),
   status: syncStepStatusSchema,
+  // TASK-P1: durasi per step (mis. "training 42 detik") — None sampai step
+  // itu mulai/selesai berjalan.
+  startedAt: z.string().nullable(),
+  durationS: z.number().nullable(),
 });
 export type SyncStep = z.infer<typeof syncStepSchema>;
 
