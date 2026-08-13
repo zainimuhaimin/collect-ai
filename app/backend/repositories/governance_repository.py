@@ -20,6 +20,14 @@ from repositories.interfaces import IGovernanceConfigRepository
 
 _CBS_WEIGHTS_CONFIG_KEY = "cbs_weights"
 
+# Operational Log di page AI Intelligence — widget sekilas, bukan log viewer
+# tersendiri. Tabel ini bertambah tanpa batas (tiap Sync + tiap perubahan
+# bobot menulis baris baru), jadi dibatasi di query (bukan di frontend) supaya
+# payload-nya tidak ikut membesar seiring waktu. TIDAK ada pagination by design
+# — kalau butuh riwayat lengkap, baca langsung dari
+# model_governance_audit_log.
+_OPERATIONAL_LOG_LIMIT = 5
+
 # Default/seed pertama kali tabel model_governance_config masih kosong — nilai
 # SAMA dengan app/machine-learning/config/settings.py (WEIGHT_PAYMENT_RATE=0.30
 # dkk, di sini dalam skala 0..100 bukan 0..1). Sengaja di-hardcode di sini
@@ -128,8 +136,9 @@ class GovernanceConfigRepository(IGovernanceConfigRepository):
             rows = conn.execute(
                 text(
                     "SELECT action, performed_by, performed_at, detail->>'status' AS status "
-                    "FROM model_governance_audit_log ORDER BY performed_at DESC"
-                )
+                    "FROM model_governance_audit_log ORDER BY performed_at DESC LIMIT :limit"
+                ),
+                {"limit": _OPERATIONAL_LOG_LIMIT},
             ).fetchall()
         return [
             GovernanceAuditEntry(

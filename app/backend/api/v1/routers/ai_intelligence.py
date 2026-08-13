@@ -137,7 +137,8 @@ def update_weighting_parameters(
     "/operational-log",
     response_model=List[OperationalLogEntrySchema],
     summary="Audit log perubahan konfigurasi AI Intelligence",
-    description="Terbaru dulu. `status` selalu 'Success' untuk saat ini — backend ini tidak punya "
+    description="Terbaru dulu, dibatasi 5 baris (widget sekilas, bukan log viewer — tidak ada "
+    "pagination by design). `status` selalu 'Success' untuk saat ini — backend ini tidak punya "
     "jalur kegagalan setelah validasi (400) lolos.",
 )
 def get_operational_log(service: GovernanceService = Depends(get_governance_service)):
