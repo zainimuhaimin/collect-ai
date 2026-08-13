@@ -97,6 +97,13 @@ def compute_features_chunked_from_loader(
     performance-report.md §3f). Chunked path HARUS meniru perilaku caller
     yang sedang dipanggil, bukan "memperbaiki" skew ini diam-diam.
     """
+    if df_contract.empty or df_customer.empty:
+        raise RuntimeError(
+            "customer_master/contract_snapshot kosong (0 baris) — tidak ada data untuk "
+            "dihitung fiturnya. Generate data dulu (faker/generate-faker-realistic.py "
+            "atau scripts/simulate_days.py --bootstrap-only) sebelum training/scoring."
+        )
+
     cust_col = "cust_id" if "cust_id" in df_contract.columns else "CUST_ID"
     contract_no_col = "contract_no" if "contract_no" in df_contract.columns else "CONTRACT_NO"
     cust_col_customer = "cust_id" if "cust_id" in df_customer.columns else "CUST_ID"

@@ -51,13 +51,14 @@ def _upsert_ai_output(engine, df_publish: pd.DataFrame):
 
     with engine.begin() as conn:
         if len(payload) > 0:
-            try:
-                conn.execute(
-                    text("DELETE FROM ai_intelligence_output WHERE scoring_date = :scoring_date"),
-                    {"scoring_date": payload["scoring_date"].iloc[0]},
-                )
-            except Exception:
-                pass
+            # PK = contract_no SAJA (bukan contract_no+scoring_date) — tabel ini
+            # snapshot "kondisi terkini", cuma boleh ada SATU tanggal aktif
+            # (lihat schema.sql). DELETE harus membersihkan SELURUH tabel, bukan
+            # cuma baris dengan scoring_date hari ini: kalau ada baris sisa dari
+            # tanggal LAIN (mis. run sebelumnya pakai --date berbeda, atau jam
+            # sistem berubah), baris itu tidak ikut terhapus lalu bentrok dengan
+            # COPY baru di contract_no yang sama -> UniqueViolation.
+            conn.execute(text("DELETE FROM ai_intelligence_output"))
             _copy_dataframe(conn, "ai_intelligence_output", payload)
 
 
