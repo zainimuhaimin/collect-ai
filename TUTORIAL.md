@@ -225,8 +225,16 @@ statis. Dua cara — pilih sesuai audiens.
 
 # Siapkan D0, lalu BERHENTI (supaya bisa dilihat di web dulu)
 python scripts/simulate_days.py --dates 2026-09-01 --bootstrap-only \
-  --horizon 2026-09-30 --customers 500 --seed 20260101
+  --horizon 2026-09-30 --customers 10000 --seed 20260101
 ```
+
+⚠️ **Pakai minimal 10.000 customer, bukan 500.** Model Self-Cure hanya
+dilatih dari kontrak yang GAGAL self-cure (kelas minoritas) — di 500-5.000
+customer populasinya cuma 15-47 baris, terlalu sedikit untuk model belajar,
+jadi `self_cure_probability` tampil kosong atau flat 0,5 di semua kontrak.
+Baru di 10.000 customer (≈106 baris kelas minoritas) modelnya belajar
+sungguhan. 3 skor lain (recovery/roll_forward/ptp_success) tidak kena
+masalah ini di skala berapa pun.
 
 → Buka web, pilih satu kontrak, catat `recovery_score`/`risk_segment`/
 `nba_recommendation`-nya.
@@ -245,7 +253,7 @@ diulang dengan tanggal lain untuk menunjukkan pergerakan bertahap.
 ./scripts/reset-demo.sh --yes
 python scripts/simulate_days.py \
   --dates 2026-09-01,2026-09-08,2026-09-30 \
-  --customers 500 --seed 20260101
+  --customers 10000 --seed 20260101
 ```
 
 Perhatikan output di terminal: bootstrap D0 akan melatih ke-4 model (butuh

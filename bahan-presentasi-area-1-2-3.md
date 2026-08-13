@@ -273,8 +273,15 @@ jadi telepon biasa).
 cd /Users/mcdmobiledev11/Development/MCD/collect-ai
 ./scripts/reset-demo.sh --yes
 python scripts/simulate_days.py --dates 2026-09-01 --bootstrap-only \
-  --horizon 2026-09-30 --customers 500 --seed 20260101
+  --horizon 2026-09-30 --customers 10000 --seed 20260101
 ```
+
+⚠️ **Pakai minimal 10.000 customer.** Di skala lebih kecil (500-5.000),
+`self_cure_probability` tampil kosong atau seragam 0,5 di semua kontrak —
+model Self-Cure hanya dilatih dari kontrak yang GAGAL self-cure (populasi
+minoritas), dan populasi itu baru cukup besar (±106 baris) untuk model
+belajar sungguhan di 10.000 customer. 3 skor lain (recovery/roll_forward/
+ptp_success) tidak terpengaruh skala ini.
 
 **② Buka web**, pilih satu kontrak, **catat skornya**.
 
@@ -292,7 +299,7 @@ dengan tanggal lain untuk menunjukkan pergerakan bertahap.
 ```bash
 ./scripts/reset-demo.sh --yes
 python scripts/simulate_days.py --dates 2026-09-01,2026-09-08,2026-09-30 \
-  --customers 500 --seed 20260101
+  --customers 10000 --seed 20260101
 python scripts/movement_report.py --out reports/movement_demo.md --top-n 10
 open reports/movement_demo.md
 ```
@@ -310,6 +317,13 @@ Yang ditunjukkan dari laporan: tabel ringkasan → matriks perpindahan (pastikan
 **"Datanya buatan, apa relevan?"**
 > Yang dibuktikan adalah **mekanismenya bekerja** — skor benar-benar bergerak
 > mengikuti transaksi. Angka persentasenya akan berbeda di data produksi.
+
+**"Kenapa self_cure_probability kadang kosong/seragam di demo?"**
+> Model Self-Cure hanya belajar dari kontrak yang GAGAL self-cure (populasi
+> minoritas) — di demo skala kecil (di bawah 10.000 customer) populasi itu
+> terlalu sedikit untuk model belajar. Bukan bug, murni kebutuhan volume
+> data minimum. Pakai `--customers 10000` (lihat §5) supaya semua 4 skor
+> tampil bermakna.
 
 ---
 
